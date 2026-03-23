@@ -1,0 +1,18 @@
+import { Router } from "express";
+import { register, login } from "./auth.controller";
+import { authMiddleware } from "../../middlewares/auth.middlewares";
+
+const router = Router();
+
+router.post("/register", register);
+router.post("/login", login);
+
+// protected test route
+router.get("/me", authMiddleware, (req, res) => {
+  res.json({
+    success: true,
+    message: "Authorized user",
+  });
+});
+
+export default router;

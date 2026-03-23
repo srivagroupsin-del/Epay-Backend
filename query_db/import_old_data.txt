@@ -1,0 +1,39 @@
+SELECT * FROM category_eparecharge_db.brand;
+SET FOREIGN_KEY_CHECKS=1;
+SET FOREIGN_KEY_CHECKS=0;
+
+INSERT INTO category_eparecharge_db.brand (
+    id,
+    brand_name,
+    description,
+    info,
+    note,
+    system_note,
+    image,
+    status,
+    is_active,
+    is_enabled,
+    created_at,
+    updated_at
+)
+SELECT 
+    UniqueId AS id,
+    BrandName AS brand_name,
+    description,
+    Info AS info,
+    note,
+    systemnote AS system_note,
+    Photo AS image,
+    
+    -- Convert old Status to enum format
+    CASE 
+        WHEN Status = '1' OR Status = 'active' THEN 'active'
+        WHEN Status = '0' OR Status = 'inactive' THEN 'inactive'
+        ELSE 'blocked'
+    END AS status,
+
+    1 AS is_active,
+    1 AS is_enabled,
+    CreateDate AS created_at,
+    UpdateDate AS updated_at
+FROM test_pay_db.brand;

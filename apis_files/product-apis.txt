@@ -1,0 +1,161 @@
+📦 PRODUCT APIs – INPUT STRUCTURES (FINAL)
+1️⃣ CREATE PRODUCT
+
+POST /api/products
+
+Used when creating ONE product
+
+Body (multipart/form-data)
+{
+  "primary_category_id": 3,
+  "secondary_category_id": 18,     // null if not used
+  "brand_id": 5,
+
+  "product_name": "iPhone 15 Pro",
+  "model": "A3102",
+  "series": "iPhone 15",
+  "alternative_name": "Apple iPhone 15 Pro",
+
+  "mrp": 129999,
+
+  "description": "Latest Apple smartphone",
+  "info": "256GB, Titanium body",
+  "note": "Top seller",
+  "system_note": "Created by admin",
+
+  "status": "active"
+}
+
+File
+base_image: <image file>
+
+2️⃣ GET ALL PRODUCTS
+
+GET /api/products
+
+No body
+
+3️⃣ GET PRODUCT BY ID
+
+GET /api/products/:id
+
+No body
+
+4️⃣ UPDATE PRODUCT (FULL UPDATE)
+
+PUT /api/products/:id
+
+Updates everything except MRP-only API
+
+Body (multipart/form-data)
+{
+  "primary_category_id": 3,
+  "secondary_category_id": 18,
+  "brand_id": 5,
+
+  "product_name": "iPhone 15 Pro Max",
+  "model": "A3103",
+  "series": "iPhone 15",
+  "alternative_name": "Apple iPhone 15 Pro Max",
+
+  "description": "Updated description",
+  "info": "512GB variant",
+  "note": "Updated note",
+  "system_note": "Updated by admin",
+
+  "status": "active"
+}
+
+File (optional)
+base_image: <new image file>
+
+5️⃣ UPDATE ONLY MRP (SINGLE PRODUCT)
+
+PUT /api/products/:id/mrp
+
+Used when price changes frequently
+
+Body (JSON)
+{
+  "mrp": 134999
+}
+
+6️⃣ BULK UPDATE ONLY MRP
+
+PUT /api/products/bulk/mrp
+
+Update price for multiple products
+
+Body (JSON)
+{
+  "products": [
+    { "id": 12, "mrp": 9999 },
+    { "id": 15, "mrp": 10999 },
+    { "id": 18, "mrp": 11999 }
+  ]
+}
+
+7️⃣ UPDATE CATEGORY + BRAND (SINGLE PRODUCT)
+
+PUT /api/products/:id/mapping
+
+Used when moving ONE product
+
+Body (JSON)
+{
+  "primary_category_id": 3,
+  "secondary_category_id": 18,   // null if none
+  "brand_id": 5
+}
+
+8️⃣ ✅ BULK UPDATE CATEGORY + BRAND (IMPORTANT)
+
+PUT /api/products/bulk/mapping
+
+This is what you asked for explicitly 💯
+
+Body (JSON)
+{
+  "product_ids": [12, 15, 18, 21],
+
+  "primary_category_id": 3,
+  "secondary_category_id": 18,   // null if not selected
+  "brand_id": 5
+}
+
+If NO secondary category
+{
+  "product_ids": [12, 15, 18],
+  "primary_category_id": 3,
+  "secondary_category_id": null,
+  "brand_id": 5
+}
+
+9️⃣ BULK UPDATE BASIC FIELDS
+
+(name + mrp + status only)
+
+PUT /api/products/bulk/update
+
+{
+  "products": [
+    {
+      "id": 12,
+      "product_name": "Samsung A15",
+      "mrp": 13999,
+      "status": "active"
+    },
+    {
+      "id": 15,
+      "product_name": "Samsung A25",
+      "mrp": 15999,
+      "status": "inactive"
+    }
+  ]
+}
+
+🔟 DELETE PRODUCT (SOFT DELETE)
+
+DELETE /api/products/:id
+
+No body

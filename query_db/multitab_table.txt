@@ -1,0 +1,184 @@
+-- =========================
+-- 1. Multitab Context Master
+-- =========================
+CREATE TABLE multitab_master (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    module_type ENUM('sector','subsector','category','brand','global') NOT NULL,
+    module_id BIGINT UNSIGNED NULL,
+
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uniq_module_context (module_type, module_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================
+-- 2. Multitab Menu (Tabs)
+-- =========================
+CREATE TABLE multitab_menu (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    multitab_id BIGINT UNSIGNED NOT NULL,
+    menu_name VARCHAR(100) NOT NULL,
+    sort_order INT DEFAULT 0,
+
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_multitab_menu_master
+        FOREIGN KEY (multitab_id)
+        REFERENCES multitab_master(id)
+        ON DELETE CASCADE,
+
+    INDEX idx_multitab_menu (multitab_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================
+-- 3. Tab Heading (Sections)
+-- =========================
+CREATE TABLE multitab_tab_heading (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    menu_id BIGINT UNSIGNED NOT NULL,
+    heading_name VARCHAR(100) NOT NULL,
+
+    title VARCHAR(255) NULL,
+    description TEXT NULL,
+    image VARCHAR(255) NULL,
+    sort_order INT DEFAULT 0,
+
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_multitab_heading_menu
+        FOREIGN KEY (menu_id)
+        REFERENCES multitab_menu(id)
+        ON DELETE CASCADE,
+
+    INDEX idx_tab_heading (menu_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================
+-- 4. Checkbox Master
+-- =========================
+CREATE TABLE multitab_checkbox_master (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    label VARCHAR(100) NOT NULL,
+    value VARCHAR(255) NULL,
+
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uniq_checkbox_label (label)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================
+-- 5. Checkbox Mapping
+-- =========================
+CREATE TABLE multitab_mapping (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    tab_heading_id BIGINT UNSIGNED NOT NULL,
+    checkbox_id BIGINT UNSIGNED NOT NULL,
+
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_multitab_mapping_heading
+        FOREIGN KEY (tab_heading_id)
+        REFERENCES multitab_tab_heading(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_multitab_mapping_checkbox
+        FOREIGN KEY (checkbox_id)
+        REFERENCES multitab_checkbox_master(id)
+        ON DELETE CASCADE,
+
+    UNIQUE KEY uniq_heading_checkbox (tab_heading_id, checkbox_id),
+    INDEX idx_mapping_heading (tab_heading_id),
+    INDEX idx_mapping_checkbox (checkbox_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+INSERT INTO multitab_master (module_type, module_id) VALUES
+('global', NULL),
+('sector', 1),
+('category', 10),
+('brand', 88);
+
+-- Global Tabs
+INSERT INTO multitab_menu (multitab_id, menu_name, sort_order) VALUES
+(1, 'Specifications', 1),
+(1, 'Warranty', 2);
+
+-- Category Tabs (Mobile Phones)
+INSERT INTO multitab_menu (multitab_id, menu_name, sort_order) VALUES
+(3, 'Mobile Specs', 1),
+(3, 'Accessories', 2);
+
+-- Brand Tabs (Samsung)
+INSERT INTO multitab_menu (multitab_id, menu_name, sort_order) VALUES
+(4, 'Samsung Features', 1);
+
+-- Specifications Tab (menu_id = 1)
+INSERT INTO multitab_tab_heading (menu_id, heading_name, sort_order) VALUES
+(1, 'RAM', 1),
+(1, 'Storage', 2);
+
+-- Warranty Tab (menu_id = 2)
+INSERT INTO multitab_tab_heading (menu_id, heading_name, sort_order) VALUES
+(2, 'Warranty Type', 1);
+
+-- Mobile Specs Tab (menu_id = 3)
+INSERT INTO multitab_tab_heading (menu_id, heading_name, sort_order) VALUES
+(3, 'Display', 1),
+(3, 'Battery', 2);
+
+-- Samsung Features Tab (menu_id = 5)
+INSERT INTO multitab_tab_heading (menu_id, heading_name, sort_order) VALUES
+(5, 'Samsung Exclusive', 1);
+
+INSERT INTO multitab_checkbox_master (label, value) VALUES
+('4 GB RAM', '4GB'),
+('8 GB RAM', '8GB'),
+('16 GB RAM', '16GB'),
+('128 GB Storage', '128GB'),
+('256 GB Storage', '256GB'),
+('1 Year Warranty', '1YR'),
+('2 Year Warranty', '2YR'),
+('AMOLED Display', 'AMOLED'),
+('6000 mAh Battery', '6000MAH'),
+('Samsung Knox Security', 'KNOX');
+
+ALTER TABLE multitab_master
+MODIFY module_type ENUM(
+'sector_title',
+  'sector',
+  'subsector',
+  'category',
+  'brand',
+  'global',
+  'product'
+) NOT NULL;

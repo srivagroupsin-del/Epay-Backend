@@ -1,0 +1,254 @@
+/category-brand/save
+
+// for primary
+
+{
+  "primary_category_id": 3,
+  "is_secondary_enabled": false,
+  "brand_ids": [1, 3, 7]
+}
+
+// for secondary
+
+{
+  "primary_category_id": 3,
+  "secondary_category_id": 18,
+  "is_secondary_enabled": true,
+  "brand_ids": [2, 5, 9]
+}
+
+✅ CASE A: PRIMARY CATEGORY VIEW
+GET /api/category-brand/context?primary_category_id=3
+
+Response (Example)
+{
+    "success": true,
+    "data": {
+        "primary_category": {
+            "id": 3,
+            "name": "Mobile"
+        },
+        "secondary_category": null,
+        "mapped_category_id": 3,
+        "brands": [
+            {
+                "id": 2,
+                "brand_name": "Apple",
+                "image": "uploads/brands/apple.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 9,
+                "brand_name": "Arduino",
+                "image": "uploads/brands/arduino.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 10,
+                "brand_name": "Boat",
+                "image": "uploads/brands/boat.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 8,
+                "brand_name": "Bosch",
+                "image": "uploads/brands/bosch.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 7,
+                "brand_name": "LG",
+                "image": "uploads/brands/lg.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 5,
+                "brand_name": "OnePlus",
+                "image": "uploads/brands/oneplus.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 4,
+                "brand_name": "Realme",
+                "image": "uploads/brands/realme.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 1,
+                "brand_name": "Redmiss",
+                "image": "1768975861897-263360213.jpg",
+                "is_mapped": 0
+            },
+            {
+                "id": 6,
+                "brand_name": "Sony",
+                "image": "uploads/brands/sony.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 3,
+                "brand_name": "Xiaomi",
+                "image": "uploads/brands/xiaomi.png",
+                "is_mapped": 0
+            }
+        ]
+    }
+}
+✅ CASE B: PRIMARY + SECONDARY VIEW
+GET /api/category-brand/context?primary_category_id=3&secondary_category_id=18
+
+Response (Example)
+{
+    "success": true,
+    "data": {
+        "primary_category": {
+            "id": 3,
+            "name": "Mobile"
+        },
+        "secondary_category": {
+            "id": 18,
+            "name": "Smartphones"
+        },
+        "mapped_category_id": 18,
+        "brands": [
+            {
+                "id": 2,
+                "brand_name": "Apple",
+                "image": "uploads/brands/apple.png",
+                "is_mapped": 1
+            },
+            {
+                "id": 9,
+                "brand_name": "Arduino",
+                "image": "uploads/brands/arduino.png",
+                "is_mapped": 1
+            },
+            {
+                "id": 10,
+                "brand_name": "Boat",
+                "image": "uploads/brands/boat.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 8,
+                "brand_name": "Bosch",
+                "image": "uploads/brands/bosch.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 7,
+                "brand_name": "LG",
+                "image": "uploads/brands/lg.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 5,
+                "brand_name": "OnePlus",
+                "image": "uploads/brands/oneplus.png",
+                "is_mapped": 1
+            },
+            {
+                "id": 4,
+                "brand_name": "Realme",
+                "image": "uploads/brands/realme.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 1,
+                "brand_name": "Redmiss",
+                "image": "1768975861897-263360213.jpg",
+                "is_mapped": 0
+            },
+            {
+                "id": 6,
+                "brand_name": "Sony",
+                "image": "uploads/brands/sony.png",
+                "is_mapped": 0
+            },
+            {
+                "id": 3,
+                "brand_name": "Xiaomi",
+                "image": "uploads/brands/xiaomi.png",
+                "is_mapped": 0
+            }
+        ]
+    }
+}
+
+GET /api/category-brand/list
+
+{
+    "success": true,
+    "data": [
+        {
+            "mapping_id": 5,
+            "primary_id": 4,
+            "primary_name": "Arduino Boards",
+            "secondary_id": null,
+            "secondary_name": null,
+            "brand_id": 7,
+            "brand_name": "LG",
+            "image": "uploads/brands/lg.png"
+        },
+        {
+            "mapping_id": 3,
+            "primary_id": 4,
+            "primary_name": "Arduino Boards",
+            "secondary_id": null,
+            "secondary_name": null,
+            "brand_id": 1,
+            "brand_name": "Redmiss",
+            "image": "1768975861897-263360213.jpg"
+        },
+        {
+            "mapping_id": 4,
+            "primary_id": 4,
+            "primary_name": "Arduino Boards",
+            "secondary_id": null,
+            "secondary_name": null,
+            "brand_id": 3,
+            "brand_name": "Xiaomi",
+            "image": "uploads/brands/xiaomi.png"
+        },
+        {
+            "mapping_id": 6,
+            "primary_id": 3,
+            "primary_name": "Mobile",
+            "secondary_id": 18,
+            "secondary_name": "Smartphones",
+            "brand_id": 2,
+            "brand_name": "Apple",
+            "image": "uploads/brands/apple.png"
+        },
+        {
+            "mapping_id": 8,
+            "primary_id": 3,
+            "primary_name": "Mobile",
+            "secondary_id": 18,
+            "secondary_name": "Smartphones",
+            "brand_id": 9,
+            "brand_name": "Arduino",
+            "image": "uploads/brands/arduino.png"
+        },
+        {
+            "mapping_id": 7,
+            "primary_id": 3,
+            "primary_name": "Mobile",
+            "secondary_id": 18,
+            "secondary_name": "Smartphones",
+            "brand_id": 5,
+            "brand_name": "OnePlus",
+            "image": "uploads/brands/oneplus.png"
+        },
+        {
+            "mapping_id": 2,
+            "primary_id": 2,
+            "primary_name": "Mobile Recharge",
+            "secondary_id": null,
+            "secondary_name": null,
+            "brand_id": 1,
+            "brand_name": "Redmiss",
+            "image": "1768975861897-263360213.jpg"
+        }
+    ]
+}

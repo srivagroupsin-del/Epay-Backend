@@ -1,0 +1,3 @@
+1. in conversation of primary to secondary or secondary to primary fom fontend inputs come multiple fo change
+2. i need fo seconday categoy need select and unselect option in api that also multiple inputs some time
+3. i need mapping update anothe seconday categoy is also mapping with diffeent pimay this is also multple inputs
