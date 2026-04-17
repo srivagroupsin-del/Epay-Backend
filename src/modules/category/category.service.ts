@@ -4,8 +4,14 @@ import path from "path";
 import { logAudit } from "../audit/audit.service";
 import { ensureUniqueActive } from "../../utils/uniqueCheck";
 /* GET */
-export const fetchCategories = async () => repo.getAllCategories();
+export const fetchCategories = async (
+  limit: number,
+  offset: number,
+  search: string,
+) => repo.getAllCategories(limit, offset, search);
+
 export const fetchPrimaryCategories = async () => repo.getPrimaryCategories();
+
 export const fetchSecondaryCategories = async (parentId: number) =>
   repo.getSecondaryByPrimary(parentId);
 
@@ -115,7 +121,6 @@ export const makePrimary = async (id: number, userId: number) => {
 
 /* DELETE */
 export const removeCategory = async (id: number, userId: number) => {
-
   await logAudit({
     user_id: userId,
     module: "category",
@@ -199,7 +204,6 @@ export const remapMultipleSecondary = async (
 /* ================= CATEGORY TAX ================= */
 
 export const createCategoryTax = async (data: any, userId: number) => {
-
   const id = await repo.createCategoryTax(data);
 
   await logAudit({
@@ -227,9 +231,8 @@ export const fetchCategoryTaxById = async (id: number) => {
 export const updateCategoryTax = async (
   id: number,
   data: any,
-  userId: number
+  userId: number,
 ) => {
-
   const old = await repo.getCategoryTaxById(id);
 
   if (!old) {
@@ -252,7 +255,6 @@ export const updateCategoryTax = async (
 };
 
 export const removeCategoryTax = async (id: number, userId: number) => {
-
   await logAudit({
     user_id: userId,
     module: "category_tax",

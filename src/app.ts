@@ -4,6 +4,7 @@ import responseTime from "response-time";
 
 import userRoutes from "./modules/users/user.routes";
 import authRoutes from "./modules/auth/auth.route";
+import apiKeyRoutes from "./modules/api_key/apiKey.routes";
 import sectorTitleRoutes from "./modules/sector-title/sector_title.route";
 import menuRoutes from "./modules/menu/menu.routes";
 import sectorRoutes from "./modules/sector/sector.routes";
@@ -26,6 +27,8 @@ import variantRoutes from "./modules/varients_feilds/varients_routes";
 import businessRoutes from "./modules/business/business.routes";
 
 import { authMiddleware } from "./middlewares/auth.middlewares";
+import { verifyApiKey } from "./middlewares/api_key.verfication";
+import { startApiKeyExpiryJob } from "./utils/api_key_CRONJOB";
 
 const app = express();
 
@@ -46,6 +49,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // JSON parser
 app.use(express.json());
 
+startApiKeyExpiryJob();
+
 // Response time logger
 app.use(
   responseTime((req: Request, res: Response, time: number) => {
@@ -61,36 +66,37 @@ app.get("/", (req: Request, res: Response) => {
   });
 });
 
-// Routes
+// 🔓 Public
 app.use("/api/auth", authRoutes);
-app.use("/api/users", authMiddleware, userRoutes);
-app.use("/api/audit", authMiddleware, auditRoutes);
-app.use("/api/menu", authMiddleware, menuRoutes);
-app.use("/api/sectorTitleRoutes", authMiddleware, sectorTitleRoutes);
-app.use("/api/sectors", authMiddleware, sectorRoutes);
-app.use("/api/sector-mapping", authMiddleware, sectorMappingRoutes);
-app.use("/api/sub-sectors", authMiddleware, subSectorRoutes);
-app.use("/api/businesses", authMiddleware, businessRoutes);
-app.use("/api/categories", authMiddleware, categoryRoutes);
-app.use("/api/brands", authMiddleware, brandRoutes);
-app.use("/api/category-brand", authMiddleware, categoryBrandRoutes);
-app.use("/api/products", authMiddleware, productRoutes);
-app.use("/api/dynamic", authMiddleware, dynamicRoutes);
-app.use("/api/categoryGroup", authMiddleware, categoryGroupRoutes);
-app.use(
-  "/api/categoryGroupMapping",
-  authMiddleware,
-  categoryGroupMappingRoutes,
-);
-app.use(
-  "/api/businessCategoryGroup",
-  authMiddleware,
-  businessCategoryGroupRoutes,
-);
-app.use("/api/variant", authMiddleware, variantRoutes); // ✅ NEW ADDED
 
-// Multitab APIs
-app.use("/api/multitab", authMiddleware, MultitabRoutes);
+// 🔐 Admin
+app.use("/api/admin/api-key", apiKeyRoutes);
+
+// 🔑 Apply API key globally
+app.use("/api", verifyApiKey);
+
+// 🔐 All protected routes
+app.use("/api", authMiddleware);
+
+// 📦 Modules
+app.use("/api/users", userRoutes);
+app.use("/api/audit", auditRoutes);
+app.use("/api/menu", menuRoutes);
+app.use("/api/sectorTitleRoutes", sectorTitleRoutes);
+app.use("/api/sectors", sectorRoutes);
+app.use("/api/sector-mapping", sectorMappingRoutes);
+app.use("/api/sub-sectors", subSectorRoutes);
+app.use("/api/businesses", businessRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/brands", brandRoutes);
+app.use("/api/category-brand", categoryBrandRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/dynamic", dynamicRoutes);
+app.use("/api/categoryGroup", categoryGroupRoutes);
+app.use("/api/categoryGroupMapping", categoryGroupMappingRoutes);
+app.use("/api/businessCategoryGroup", businessCategoryGroupRoutes);
+app.use("/api/variant", variantRoutes);
+app.use("/api/multitab", MultitabRoutes);
 
 // Static uploads
 app.use("/uploads", express.static("uploads"));

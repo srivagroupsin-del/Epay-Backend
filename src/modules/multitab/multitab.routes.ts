@@ -17,6 +17,7 @@ r.post(
   uploadTo("multitab").single("image"),
   c.createHeading,
 );
+
 r.get("/multitab-heading/all", c.getAllHeadings);
 r.get("/multitab-heading/tab/:id", c.getHeadingsByTab);
 r.get("/multitab-heading/:id", c.getHeadingById);
@@ -25,6 +26,7 @@ r.put(
   uploadTo("multitab").single("image"),
   c.updateHeading,
 );
+
 r.delete("/multitab-heading/:id", c.deleteHeading);
 
 /* CHECKBOX */

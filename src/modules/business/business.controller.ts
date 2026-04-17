@@ -2,12 +2,10 @@ import { Response } from "express";
 import { AuthRequest } from "../../middlewares/auth.middlewares";
 import * as service from "./business.service";
 
-export const getAllBusinesses = async (
-  req: AuthRequest,
-  res: Response
-) => {
+export const getAllBusinesses = async (req: AuthRequest, res: Response) => {
   try {
-    const result = await service.getAllBusinesses();
+    const userId = req.user!.id; // 🔥 GET FROM JWT
+    const result = await service.getAllBusinesses(userId);
 
     res.json({
       success: true,
@@ -21,10 +19,7 @@ export const getAllBusinesses = async (
   }
 };
 
-export const getBusinessById = async (
-  req: AuthRequest,
-  res: Response
-) => {
+export const getBusinessById = async (req: AuthRequest, res: Response) => {
   try {
     const id = Number(req.params.id);
 

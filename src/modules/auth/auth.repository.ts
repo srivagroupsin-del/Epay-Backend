@@ -2,17 +2,17 @@ import pool from "../../config/db";
 import { parseJSON } from "../../utils/json.helper";
 
 /**
- * Find user by email
+ * Find user by email OR phone
  */
 export const findUserByEmail = async (email: string) => {
   const [rows]: any = await pool.query(
     `SELECT
        *,
-       JSON_EXTRACT(details, '$.*') as details_values,   -- Changed alias
-       JSON_EXTRACT(add_json, '$.*') as add_json_values  -- Changed alias
+       JSON_EXTRACT(details, '$.*') as details_values,
+       JSON_EXTRACT(add_json, '$.*') as add_json_values
      FROM users
-     WHERE email = ? AND is_active = 1
-        OR JSON_UNQUOTE(JSON_EXTRACT(details, '$.phone')) = ?
+     WHERE (email = ? AND is_active = 1)
+        OR (JSON_UNQUOTE(JSON_EXTRACT(details, '$.phone')) = ? AND is_active = 1)
      LIMIT 1;
     `,
     [email, email],
@@ -22,7 +22,6 @@ export const findUserByEmail = async (email: string) => {
 
   const user = rows[0];
 
-  // ✅ Clean up the JSON strings using your util
   user.details = parseJSON(user.details);
   user.add_json = parseJSON(user.add_json);
   user.details_values = parseJSON(user.details_values);
@@ -41,10 +40,48 @@ export const createUser = async (data: {
   password: string;
 }) => {
   const [result]: any = await pool.query(
-    `INSERT INTO users (name, email, password, status)
-     VALUES (?, ?, ?, 'active')`,
-    [data.name, data.email, data.password],
+    `INSERT INTO users (user_id, name, email, password, status, is_active)
+     VALUES (?, ?, ?, ?, 'active', 1)`,
+    [data.user_id, data.name, data.email, data.password],
   );
 
   return result.insertId;
+};
+
+/**
+ * Update central user_main_id
+ */
+export const updateUserMainId = async (userId: number, userMainId: string) => {
+  await pool.query(`UPDATE users SET user_id = ? WHERE id = ?`, [
+    userMainId,
+    userId,
+  ]);
+};
+
+/**
+ * Save central token
+ */
+export const updateCentralToken = async (
+  userId: number,
+  token: string,
+  expiry: string,
+) => {
+  await pool.query(
+    `UPDATE users
+     SET central_token = ?, central_token_expiry = ?
+     WHERE id = ?`,
+    [token, expiry, userId],
+  );
+};
+
+/**
+ * Get user by ID
+ */
+export const getUserById = async (id: number) => {
+  const [rows]: any = await pool.query(
+    `SELECT * FROM users WHERE id = ? LIMIT 1`,
+    [id],
+  );
+
+  return rows[0] || null;
 };

@@ -37,21 +37,24 @@ export const createProduct = async (data: any) => {
         data.system_note || null,
         data.base_image,
         data.status,
-      ]
+      ],
     );
 
     const productId = result.insertId;
 
-    if (Array.isArray(data.alternative_names) && data.alternative_names.length) {
+    if (
+      Array.isArray(data.alternative_names) &&
+      data.alternative_names.length
+    ) {
       const altValues = data.alternative_names.map((name: string) => [
         productId,
-        name
+        name,
       ]);
 
       await conn.query(
         `INSERT INTO product_alternative_names (product_id, alternative_name)
         VALUES ?`,
-        [altValues]
+        [altValues],
       );
     }
 
@@ -60,7 +63,7 @@ export const createProduct = async (data: any) => {
     await conn.query(
       `INSERT INTO product_category_brand (product_id, category_brand_id)
        VALUES ?`,
-      [values]
+      [values],
     );
 
     await conn.commit();
@@ -76,56 +79,107 @@ export const createProduct = async (data: any) => {
 /* ===============================
    GET ALL PRODUCTS
 ================================ */
-export const getProducts = async () => {
-  const [rows] = await pool.query(`
-     SELECT
-    p.id,
-    p.product_name,
-    -- New columns for your dashboard headers
-    GROUP_CONCAT(DISTINCT COALESCE(parent_c.category_name, c.category_name) ORDER BY COALESCE(parent_c.category_name, c.category_name) SEPARATOR ', ') AS primary_category,
-    GROUP_CONCAT(DISTINCT CASE WHEN parent_c.id IS NOT NULL THEN c.category_name ELSE NULL END ORDER BY c.category_name SEPARATOR ', ') AS secondary_category,
-    
-    p.mrp,
-    p.model,
-    p.series,
-    p.description,
-    p.info,
-    p.note,
-    p.system_note,
-    p.base_image,
-    p.status,
-    GROUP_CONCAT(DISTINCT b.brand_name ORDER BY b.brand_name SEPARATOR ', ') AS brands,
-    GROUP_CONCAT(
-        DISTINCT CONCAT(c.category_name, ' (', b.brand_name, ')')
-        ORDER BY c.category_name
-        SEPARATOR ', '
-    ) AS mappings
-FROM product p
-LEFT JOIN product_category_brand pcb 
-    ON pcb.product_id = p.id
-LEFT JOIN category_brand_mapping cb 
-    ON cb.id = pcb.category_brand_id
-    AND cb.is_active = 1
-LEFT JOIN brand b 
-    ON b.id = cb.brand_id
-    AND b.is_active = 1
-LEFT JOIN category c 
-    ON c.id = cb.category_id
-    AND c.is_active = 1
--- Self-join to determine the hierarchy
-LEFT JOIN category parent_c 
-    ON c.parent_category_id = parent_c.id
-    AND parent_c.is_active = 1
-WHERE p.is_active = 1
-GROUP BY p.id, p.product_name, p.mrp, p.status, p.model, p.series, p.description, p.info, p.note, p.system_note, p.base_image
-`);
+export const getProducts = async ({
+  limit,
+  offset,
+  search,
+  brand,
+  category,
+  status,
+}: any) => {
+  let where = `WHERE p.is_active = 1`;
+  const values: any[] = [];
 
-  return rows;
+  // 🔍 SEARCH
+  if (search) {
+    where += ` AND (p.product_name LIKE ? OR p.model LIKE ?)`;
+    values.push(`%${search}%`, `%${search}%`);
+  }
+
+  // 🏷️ BRAND FILTER
+  if (brand) {
+    where += ` AND b.brand_name = ?`;
+    values.push(brand);
+  }
+
+  // 📦 CATEGORY FILTER
+  if (category) {
+    where += ` AND c.category_name = ?`;
+    values.push(category);
+  }
+
+  // ⚡ STATUS FILTER
+  if (status) {
+    where += ` AND p.status = ?`;
+    values.push(status);
+  }
+
+  const dataQuery = `
+    SELECT
+      p.id,
+      p.product_name,
+      p.mrp,
+      p.model,
+      p.series,
+      p.base_image,
+      p.status,
+
+      GROUP_CONCAT(DISTINCT b.brand_name) AS brands,
+      GROUP_CONCAT(DISTINCT c.category_name) AS categories
+
+    FROM product p
+
+    LEFT JOIN product_category_brand pcb 
+      ON pcb.product_id = p.id
+
+    LEFT JOIN category_brand_mapping cb 
+      ON cb.id = pcb.category_brand_id
+
+    LEFT JOIN brand b 
+      ON b.id = cb.brand_id
+
+    LEFT JOIN category c 
+      ON c.id = cb.category_id
+
+    ${where}
+
+    GROUP BY p.id
+
+    ORDER BY p.id DESC
+
+    LIMIT ? OFFSET ?
+  `;
+
+  values.push(limit, offset);
+
+  const [rows] = await pool.query(dataQuery, values);
+
+  // 🔥 TOTAL COUNT (for pagination UI)
+  const countQuery = `
+    SELECT COUNT(DISTINCT p.id) as total
+    FROM product p
+    LEFT JOIN product_category_brand pcb 
+      ON pcb.product_id = p.id
+    LEFT JOIN category_brand_mapping cb 
+      ON cb.id = pcb.category_brand_id
+    LEFT JOIN brand b 
+      ON b.id = cb.brand_id
+    LEFT JOIN category c 
+      ON c.id = cb.category_id
+    ${where}
+  `;
+
+  const [countResult]: any = await pool.query(
+    countQuery,
+    values.slice(0, values.length - 2),
+  );
+
+  return {
+    data: rows,
+    total: countResult[0].total,
+  };
 };
 
-/* ===============================
-   GET PRODUCT BY ID
-================================ */
 export const getProductById = async (id: number) => {
   const [rows]: any = await pool.query(
     `
@@ -133,7 +187,6 @@ export const getProductById = async (id: number) => {
       p.id,
       p.product_name,
       p.model,
-      GROUP_CONCAT(pan.alternative_name) AS alternative_names,
       p.series,
       p.mrp,
       p.description,
@@ -143,19 +196,19 @@ export const getProductById = async (id: number) => {
       p.base_image,
       p.status,
 
-      cb.id AS mapping_id,
+      pan.alternative_name,
 
+      cb.id AS mapping_id,
       c.id AS category_id,
       c.category_name,
       c.category_type,
-
       pc.id AS primary_category_id,
-      COALESCE(pc.category_name, '-') AS primary_category_name,
-
+      pc.category_name AS primary_category_name,
       b.id AS brand_id,
-      COALESCE(b.brand_name, '-') AS brand_name
+      b.brand_name
 
     FROM product p
+
     LEFT JOIN product_alternative_names pan
       ON pan.product_id = p.id
 
@@ -164,33 +217,26 @@ export const getProductById = async (id: number) => {
 
     LEFT JOIN category_brand_mapping cb
       ON cb.id = pcb.category_brand_id
-      AND cb.is_active = 1
 
     LEFT JOIN category c
       ON c.id = cb.category_id
-      AND c.is_active = 1
 
     LEFT JOIN category pc
       ON pc.id = c.parent_category_id
-      AND pc.is_active = 1
 
     LEFT JOIN brand b
       ON b.id = cb.brand_id
-      AND b.is_active = 1
 
     WHERE p.id = ?
       AND p.is_active = 1
-
-    GROUP BY p.id, cb.id, c.id, pc.id, b.id
     `,
-    [id]
+    [id],
   );
 
   if (!rows.length) return null;
 
-  return rows; // return all rows, not only first
+  return rows; // ✅ IMPORTANT (NOT rows[0])
 };
-
 /* ===============================
    GET PRODUCT MAPPINGS
 ================================ */
@@ -283,38 +329,35 @@ export const updateProduct = async (id: number, data: any) => {
       data.base_image || null,
       data.status,
       id,
-    ]
+    ],
   );
 };
 
 export const updateProductAlternativeNames = async (
   productId: number,
-  names: string[]
+  names: string[],
 ) => {
-
   const conn = await pool.getConnection();
 
   try {
-
     await conn.beginTransaction();
 
     await conn.query(
       `DELETE FROM product_alternative_names WHERE product_id = ?`,
-      [productId]
+      [productId],
     );
 
     if (names.length) {
-      const values = names.map(name => [productId, name]);
+      const values = names.map((name) => [productId, name]);
 
       await conn.query(
         `INSERT INTO product_alternative_names (product_id, alternative_name)
          VALUES ?`,
-        [values]
+        [values],
       );
     }
 
     await conn.commit();
-
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -328,7 +371,7 @@ export const updateProductAlternativeNames = async (
 ================================ */
 export const updateProductMappings = async (
   productId: number,
-  mappingIds: number[]
+  mappingIds: number[],
 ) => {
   // 1️⃣ Must be array
   if (!Array.isArray(mappingIds) || mappingIds.length === 0) {
@@ -347,15 +390,15 @@ export const updateProductMappings = async (
 
     await conn.query(
       `DELETE FROM product_category_brand WHERE product_id = ?`,
-      [productId]
+      [productId],
     );
 
-    const values = mappingIds.map(id => [productId, id]);
+    const values = mappingIds.map((id) => [productId, id]);
 
     await conn.query(
       `INSERT INTO product_category_brand (product_id, category_brand_id)
        VALUES ?`,
-      [values]
+      [values],
     );
 
     await conn.commit();
@@ -404,59 +447,51 @@ export const getProductForQrPdf = async (productId: number) => {
       AND p.is_active = 1
     LIMIT 1
     `,
-    [productId]
+    [productId],
   );
 
   return row || null;
 };
 
 export const updateProductTx = async (id: number, data: any) => {
-  await pool.query(
-    `UPDATE product SET product_name=?, mrp=? WHERE id=?`,
-    [data.product_name, data.mrp, id]
-  );
+  await pool.query(`UPDATE product SET product_name=?, mrp=? WHERE id=?`, [
+    data.product_name,
+    data.mrp,
+    id,
+  ]);
 };
 
 export const updateProductMappingsTx = async (
   productId: number,
-  mappingIds: number[]
+  mappingIds: number[],
 ) => {
-  await pool.query(
-    `DELETE FROM product_category_brand WHERE product_id = ?`,
-    [productId]
-  );
+  await pool.query(`DELETE FROM product_category_brand WHERE product_id = ?`, [
+    productId,
+  ]);
 
-  const values = mappingIds.map(id => [productId, id]);
+  const values = mappingIds.map((id) => [productId, id]);
 
   await pool.query(
     `INSERT INTO product_category_brand (product_id, category_brand_id)
      VALUES ?`,
-    [values]
+    [values],
   );
 };
 
-
 export const createProductTax = async (data: any) => {
-
   const [result]: any = await pool.query(
     `INSERT INTO product_tax
      (product_id, gst_variant_id, hsn_code)
      VALUES (?, ?, ?)`,
-    [
-      data.product_id,
-      data.gst_variant_id,
-      data.hsn_code || null
-    ]
+    [data.product_id, data.gst_variant_id, data.hsn_code || null],
   );
 
   return result.insertId;
 };
 
-
 /* ================= GET ALL ================= */
 
 export const getAllProductTax = async () => {
-
   const [rows] = await pool.query(
     `SELECT
         pt.id,
@@ -483,34 +518,30 @@ export const getAllProductTax = async () => {
 
      WHERE pt.is_active = 1
 
-     ORDER BY pt.id DESC`
+     ORDER BY pt.id DESC`,
   );
 
   return rows;
 };
 
-
 /* ================= GET BY ID ================= */
 
 export const getProductTaxById = async (id: number) => {
-
   const [[row]]: any = await pool.query(
     `SELECT *
      FROM product_tax
      WHERE id = ?
        AND is_active = 1
      LIMIT 1`,
-    [id]
+    [id],
   );
 
   return row || null;
 };
 
-
 /* ================= UPDATE ================= */
 
 export const updateProductTax = async (id: number, data: any) => {
-
   await pool.query(
     `UPDATE product_tax
      SET product_id = ?,
@@ -523,22 +554,18 @@ export const updateProductTax = async (id: number, data: any) => {
       data.gst_variant_id,
       data.hsn_code || null,
       data.status,
-      id
-    ]
+      id,
+    ],
   );
-
 };
-
 
 /* ================= DELETE ================= */
 
 export const deleteProductTax = async (id: number) => {
-
   await pool.query(
     `UPDATE product_tax
      SET is_active = 0
      WHERE id = ?`,
-    [id]
+    [id],
   );
-
 };

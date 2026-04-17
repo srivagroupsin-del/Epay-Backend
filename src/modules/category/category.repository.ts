@@ -11,51 +11,71 @@ export const getCategoryById = async (id: number) => {
   return row || null;
 };
 
-export const getAllCategories = async () => {
-  const [rows] = await pool.query(
-    `SELECT	
-    c.id,
-    c.category_name,
-    c.category_type,
-    c.description,
-    c.info,
-    c.note,
-    c.system_note,
-    c.image,
-    c.status,
-    c.sector_title_id,
-    c.sector_id,
-    c.sub_sector_id,
+export const getAllCategories = async (
+  limit: number,
+  offset: number,
+  search: string,
+) => {
+  let where = `WHERE c.is_active = 1`;
+  const values: any[] = [];
 
-    COALESCE(st.name, '-') AS sector_title_name,
-    COALESCE(s.sector_name, '-') AS sector_name,
-    COALESCE(ss.sub_sector_name, '-') AS sub_sector_name,
+  // 🔥 ADD THIS
+  if (search) {
+    where += ` AND c.category_name LIKE ?`;
+    values.push(`%${search}%`);
+  }
 
-    pc.id AS parent_category_id,
-    COALESCE(pc.category_name, '-') AS parent_category_name
+  const query = `
+    SELECT	
+        c.id,
+        c.category_name,
+        c.category_type,
+        c.description,
+        c.info,
+        c.note,
+        c.system_note,
+        c.image,
+        c.status,
+        c.sector_title_id,
+        c.sector_id,
+        c.sub_sector_id,
 
-FROM category c
+        COALESCE(st.name, '-') AS sector_title_name,
+        COALESCE(s.sector_name, '-') AS sector_name,
+        COALESCE(ss.sub_sector_name, '-') AS sub_sector_name,
 
-LEFT JOIN sector_title st 
-    ON st.id = c.sector_title_id 
-    AND st.is_active = 1
+        pc.id AS parent_category_id,
+        COALESCE(pc.category_name, '-') AS parent_category_name
 
-LEFT JOIN sector s 
-    ON s.id = c.sector_id 
-    AND s.is_active = 1
+    FROM category c
 
-LEFT JOIN sub_sector ss 
-    ON ss.id = c.sub_sector_id 
-    AND ss.is_active = 1
+    LEFT JOIN sector_title st 
+        ON st.id = c.sector_title_id 
+        AND st.is_active = 1
 
-LEFT JOIN category pc
-    ON pc.id = c.parent_category_id
-    AND pc.is_active = 1
+    LEFT JOIN sector s 
+        ON s.id = c.sector_id 
+        AND s.is_active = 1
 
-WHERE c.is_active = 1
+    LEFT JOIN sub_sector ss 
+        ON ss.id = c.sub_sector_id 
+        AND ss.is_active = 1
 
-ORDER BY c.category_name ASC;`
-  );
+    LEFT JOIN category pc
+        ON pc.id = c.parent_category_id
+        AND pc.is_active = 1
+
+    ${where}
+
+    ORDER BY c.id DESC
+
+    LIMIT ? OFFSET ?
+  `;
+
+  values.push(Number(limit), Number(offset));
+
+  const [rows] = await pool.query(query, values);
+
   return rows;
 };
 
@@ -272,25 +292,18 @@ export const bulkRemapSecondary = async (
 
 /* CREATE */
 export const createCategoryTax = async (data: any) => {
-
   const [result]: any = await pool.query(
     `INSERT INTO category_tax
      (category_id, gst_variant_id, hsn_code)
      VALUES (?, ?, ?)`,
-    [
-      data.category_id,
-      data.gst_variant_id,
-      data.hsn_code || null
-    ]
+    [data.category_id, data.gst_variant_id, data.hsn_code || null],
   );
 
   return result.insertId;
 };
 
-
 /* GET ALL */
 export const getAllCategoryTax = async () => {
-
   const [rows] = await pool.query(
     `SELECT
     ct.id,
@@ -324,32 +337,28 @@ LEFT JOIN variants_fields vf
     ON vf.id = ct.gst_variant_id
     AND vf.is_active = 1
 
-WHERE ct.is_active = 1`
+WHERE ct.is_active = 1`,
   );
 
   return rows;
 };
 
-
 /* GET BY ID */
 export const getCategoryTaxById = async (id: number) => {
-
   const [[row]]: any = await pool.query(
     `SELECT *
      FROM category_tax
      WHERE id = ?
        AND is_active = 1
      LIMIT 1`,
-    [id]
+    [id],
   );
 
   return row || null;
 };
 
-
 /* UPDATE */
 export const updateCategoryTax = async (id: number, data: any) => {
-
   await pool.query(
     `UPDATE category_tax
      SET category_id = ?,
@@ -362,21 +371,17 @@ export const updateCategoryTax = async (id: number, data: any) => {
       data.gst_variant_id,
       data.hsn_code || null,
       data.status,
-      id
-    ]
+      id,
+    ],
   );
-
 };
-
 
 /* SOFT DELETE */
 export const deleteCategoryTax = async (id: number) => {
-
   await pool.query(
     `UPDATE category_tax
      SET is_active = 0
      WHERE id = ?`,
-    [id]
+    [id],
   );
-
 };

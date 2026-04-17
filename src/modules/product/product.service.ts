@@ -10,15 +10,15 @@ import { ensureUniqueActive } from "../../utils/uniqueCheck";
 /* =========================================
    FETCH ALL PRODUCTS
 ========================================= */
-export const fetchProducts = async () => {
-  return repo.getProducts();
+export const fetchProducts = async (params: any) => {
+  return repo.getProducts(params);
 };
-
 /* =========================================
    FETCH SINGLE PRODUCT
 ========================================= */
 export const fetchProductById = async (id: number) => {
   const rows = await repo.getProductById(id);
+
   if (!rows || rows.length === 0) {
     throw new Error("Product not found");
   }
@@ -30,7 +30,6 @@ export const fetchProductById = async (id: number) => {
     product_name: first.product_name,
     model: first.model,
     series: first.series,
-    alternative_name: first.alternative_name,
     mrp: first.mrp,
     description: first.description,
     info: first.info,
@@ -38,23 +37,37 @@ export const fetchProductById = async (id: number) => {
     system_note: first.system_note,
     base_image: first.base_image,
     status: first.status,
+    alternative_names: [] as string[],
     mappings: [] as any[],
   };
 
-  for (const row of rows) {
-    if (!row.mapping_id) continue;
+  const altSet = new Set<string>();
+  const mapSet = new Set<number>();
 
-    product.mappings.push({
-      mapping_id: row.mapping_id,
-      category_id: row.category_id,
-      category_name: row.category_name,
-      category_type: row.category_type,
-      primary_category_id: row.primary_category_id,
-      primary_category_name: row.primary_category_name,
-      brand_id: row.brand_id,
-      brand_name: row.brand_name,
-    });
+  for (const row of rows) {
+    // ✅ alternative names
+    if (row.alternative_name) {
+      altSet.add(row.alternative_name);
+    }
+
+    // ✅ mappings
+    if (row.mapping_id && !mapSet.has(row.mapping_id)) {
+      mapSet.add(row.mapping_id);
+
+      product.mappings.push({
+        mapping_id: row.mapping_id,
+        category_id: row.category_id,
+        category_name: row.category_name,
+        category_type: row.category_type,
+        primary_category_id: row.primary_category_id,
+        primary_category_name: row.primary_category_name,
+        brand_id: row.brand_id,
+        brand_name: row.brand_name,
+      });
+    }
   }
+
+  product.alternative_names = Array.from(altSet);
 
   return product;
 };
@@ -89,15 +102,18 @@ export const createProduct = async (data: any, userId: number) => {
 /* =========================================
    UPDATE PRODUCT (INFO + OPTIONAL MAPPINGS)
 ========================================= */
-export const updateProduct = async (
-  id: number,
-  data: any,
-  userId: number
-) => {
+export const updateProduct = async (id: number, data: any, userId: number) => {
   await ensureUniqueActive("product", "model", data.model, id);
 
+  // 1️⃣ update product
   await repo.updateProduct(id, data);
 
+  // 2️⃣ update alternative names ✅ ADD THIS
+  if (Array.isArray(data.alternative_names)) {
+    await repo.updateProductAlternativeNames(id, data.alternative_names);
+  }
+
+  // 3️⃣ update mappings
   if (Array.isArray(data.mappings) && data.mappings.length > 0) {
     const resolvedMappingIds = await resolveMappings(data.mappings);
     await repo.updateProductMappings(id, resolvedMappingIds);
@@ -113,14 +129,13 @@ export const updateProduct = async (
 
   return { message: "Product updated successfully" };
 };
-
 /* =========================================
    UPDATE ONLY MAPPINGS
 ========================================= */
 export const updateProductMappings = async (
   productId: number,
   mappings: any[],
-  userId: number
+  userId: number,
 ) => {
   if (!Array.isArray(mappings) || mappings.length === 0) {
     throw new Error("Mappings must be a non-empty array");
@@ -184,7 +199,7 @@ export const updateMRP = async (id: number, mrp: number, userId: number) => {
 export const bulkUpdateMappings = async (
   productIds: number[],
   mappingIds: number[],
-  userId: number
+  userId: number,
 ) => {
   if (!Array.isArray(productIds) || productIds.length === 0) {
     throw new Error("productIds must be a non-empty array");
@@ -226,7 +241,6 @@ const resolveMappings = async (mappings: any[]) => {
   const resolved: number[] = [];
 
   for (const m of mappings) {
-
     const primaryId = Number(m.primary_id);
     const secondaryId = Number(m.secondary_id);
     const brandId = Number(m.brand_id);
@@ -250,12 +264,11 @@ const resolveMappings = async (mappings: any[]) => {
         AND brand_id = ?
         AND is_active = 1
       `,
-      [categoryId, brandId]
+      [categoryId, brandId],
     );
 
     // 🔥 Fallback to primary if secondary mapping not found
     if (!rows.length && secondaryId > 0) {
-
       [rows] = await pool.query(
         `
         SELECT id
@@ -264,13 +277,13 @@ const resolveMappings = async (mappings: any[]) => {
           AND brand_id = ?
           AND is_active = 1
         `,
-        [primaryId, brandId]
+        [primaryId, brandId],
       );
     }
 
     if (!rows.length) {
       throw new Error(
-        `Invalid category-brand combination (Category: ${categoryId}, Brand: ${brandId})`
+        `Invalid category-brand combination (Category: ${categoryId}, Brand: ${brandId})`,
       );
     }
 
@@ -279,7 +292,6 @@ const resolveMappings = async (mappings: any[]) => {
 
   return [...new Set(resolved)];
 };
-
 
 export const fetchProductMappings = async () => {
   return repo.getProductsWithMappings();
@@ -324,7 +336,7 @@ export const generateProductQrPdf = async (productId: number) => {
 
   doc.end();
 
-  await new Promise(resolve => stream.on("finish", resolve));
+  await new Promise((resolve) => stream.on("finish", resolve));
 
   return { fileName, filePath };
 };
@@ -332,33 +344,48 @@ export const generateProductQrPdf = async (productId: number) => {
 export const updateFullProduct = async (
   product: any,
   mappings: number[],
-  userId: number
+  alternative_names: string[],
+  userId: number,
 ) => {
-  if (!Array.isArray(mappings) || mappings.length === 0) {
-    throw new Error("Mappings cannot be empty");
-  }
-
-  const uniqueMappings = [...new Set(mappings)];
-
   const conn = await pool.getConnection();
 
   try {
+    await conn.beginTransaction();
 
+    // 1️⃣ product
     await repo.updateProductTx(product.id, product);
+
+    // 2️⃣ alternative names
+    await conn.query(
+      `DELETE FROM product_alternative_names WHERE product_id = ?`,
+      [product.id],
+    );
+
+    if (alternative_names?.length) {
+      const values = alternative_names.map((name) => [product.id, name]);
+
+      await conn.query(
+        `INSERT INTO product_alternative_names (product_id, alternative_name)
+         VALUES ?`,
+        [values],
+      );
+    }
+
+    // 3️⃣ mappings
+    const uniqueMappings = [...new Set(mappings)];
     await repo.updateProductMappingsTx(product.id, uniqueMappings);
+
+    await conn.commit();
 
     await logAudit({
       user_id: userId,
       module: "product",
       record_id: product.id,
       action: "update",
-      new_data: { product, mappings: uniqueMappings },
+      new_data: { product, mappings, alternative_names },
     });
 
-    await conn.commit();
-
     return { message: "Product updated successfully" };
-
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -368,7 +395,6 @@ export const updateFullProduct = async (
 };
 
 export const createProductTax = async (data: any, userId: number) => {
-
   const id = await repo.createProductTax(data);
 
   await logAudit({
@@ -381,10 +407,9 @@ export const createProductTax = async (data: any, userId: number) => {
 
   return {
     id,
-    message: "Product tax created successfully"
+    message: "Product tax created successfully",
   };
 };
-
 
 /* GET */
 
@@ -396,15 +421,13 @@ export const fetchProductTaxById = async (id: number) => {
   return repo.getProductTaxById(id);
 };
 
-
 /* UPDATE */
 
 export const updateProductTax = async (
   id: number,
   data: any,
-  userId: number
+  userId: number,
 ) => {
-
   const old = await repo.getProductTaxById(id);
 
   if (!old) {
@@ -422,15 +445,13 @@ export const updateProductTax = async (
   });
 
   return {
-    message: "Product tax updated successfully"
+    message: "Product tax updated successfully",
   };
 };
-
 
 /* DELETE */
 
 export const removeProductTax = async (id: number, userId: number) => {
-
   await logAudit({
     user_id: userId,
     module: "product_tax",
@@ -442,6 +463,6 @@ export const removeProductTax = async (id: number, userId: number) => {
   await repo.deleteProductTax(id);
 
   return {
-    message: "Product tax deleted successfully"
+    message: "Product tax deleted successfully",
   };
 };

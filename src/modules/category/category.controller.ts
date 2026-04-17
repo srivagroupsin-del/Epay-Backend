@@ -4,9 +4,25 @@ import fs from "fs";
 import { AuthRequest } from "../../middlewares/auth.middlewares";
 
 /* GET */
-export const getCategories = async (_: Request, res: Response) => {
-  const data = await service.fetchCategories();
-  res.json({ success: true, data });
+export const getCategories = async (req: Request, res: Response) => {
+  try {
+    const limit = Number(req.query.limit) || 10;
+    const page = Number(req.query.page) || 1;
+    const search = (req.query.search as string) || "";
+
+    let offset = (page - 1) * limit;
+
+    // 🔥 IMPORTANT FIX
+    if (search) {
+      offset = 0; // reset
+    }
+
+    const data = await service.fetchCategories(limit, offset, search);
+
+    res.json({ success: true, data });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 export const getPrimaryCategories = async (_: Request, res: Response) => {
@@ -180,9 +196,7 @@ export const bulkRemapSecondary = async (req: AuthRequest, res: Response) => {
 /* ================= CATEGORY TAX ================= */
 
 export const createCategoryTax = async (req: AuthRequest, res: Response) => {
-
   try {
-
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -193,46 +207,36 @@ export const createCategoryTax = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json({
       success: true,
-      data: result
+      data: result,
     });
-
   } catch (error: any) {
-
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
-
   }
-
 };
 
 export const getCategoryTax = async (_: Request, res: Response) => {
-
   const data = await service.fetchCategoryTax();
 
   res.json({
     success: true,
-    data
+    data,
   });
-
 };
 
 export const getCategoryTaxById = async (req: Request, res: Response) => {
-
   const data = await service.fetchCategoryTaxById(Number(req.params.id));
 
   res.json({
     success: true,
-    data
+    data,
   });
-
 };
 
 export const updateCategoryTax = async (req: AuthRequest, res: Response) => {
-
   try {
-
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -242,41 +246,32 @@ export const updateCategoryTax = async (req: AuthRequest, res: Response) => {
     const result = await service.updateCategoryTax(
       Number(req.params.id),
       req.body,
-      userId
+      userId,
     );
 
     res.json({
       success: true,
-      data: result
+      data: result,
     });
-
   } catch (error: any) {
-
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
-
   }
-
 };
 
 export const deleteCategoryTax = async (req: AuthRequest, res: Response) => {
-
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const userId = req.user.id;
 
-  const result = await service.removeCategoryTax(
-    Number(req.params.id),
-    userId
-  );
+  const result = await service.removeCategoryTax(Number(req.params.id), userId);
 
   res.json({
     success: true,
-    data: result
+    data: result,
   });
-
 };

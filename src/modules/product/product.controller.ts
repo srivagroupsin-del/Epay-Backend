@@ -5,10 +5,29 @@ import { AuthRequest } from "../../middlewares/auth.middlewares";
 /* ===============================
    GET ROUTES
 ================================ */
-export const getProducts = async (_: Request, res: Response) => {
+export const getProducts = async (req: Request, res: Response) => {
   try {
-    const data = await service.fetchProducts();
-    res.json({ success: true, data });
+    const limit = Number(req.query.limit) || 20;
+    const page = Number(req.query.page) || 1;
+
+    const params = {
+      limit,
+      offset: (page - 1) * limit,
+      search: req.query.search || "",
+      brand: req.query.brand || "",
+      category: req.query.category || "",
+      status: req.query.status || "",
+    };
+
+    const result = await service.fetchProducts(params);
+
+    res.json({
+      success: true,
+      data: result.data,
+      total: result.total,
+      page,
+      limit,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -23,21 +42,15 @@ export const getProductById = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * FETCH CURRENT MAPPINGS FOR EDIT FLOW
- */
 export const getProductMappings = async (req: Request, res: Response) => {
   try {
     const data = await service.fetchProductMappings();
-    res.json({ success: true, data }); 
+    res.json({ success: true, data });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
 
-/* ===============================
-   POST / PUT / DELETE
-================================ */
 export const createProduct = async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
@@ -46,15 +59,19 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
     const result = await service.createProduct(
       {
         ...req.body,
-        mappings: req.body.mappings ? (typeof req.body.mappings === 'string' ? JSON.parse(req.body.mappings) : req.body.mappings) : [],
+        mappings: req.body.mappings
+          ? typeof req.body.mappings === "string"
+            ? JSON.parse(req.body.mappings)
+            : req.body.mappings
+          : [],
         alternative_names: req.body.alternative_names
-        ? (typeof req.body.alternative_names === "string"
+          ? typeof req.body.alternative_names === "string"
             ? JSON.parse(req.body.alternative_names)
-            : req.body.alternative_names)
-        : [],
+            : req.body.alternative_names
+          : [],
         base_image: req.file?.filename,
       },
-      userId
+      userId,
     );
     res.status(201).json({ success: true, data: result });
   } catch (error: any) {
@@ -71,34 +88,33 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
     const result = await service.updateProduct(
       Number(req.params.id),
       {
-       ...req.body,
+        ...req.body,
         mappings: req.body.mappings
-          ? (typeof req.body.mappings === "string"
-              ? JSON.parse(req.body.mappings)
-              : req.body.mappings)
+          ? typeof req.body.mappings === "string"
+            ? JSON.parse(req.body.mappings)
+            : req.body.mappings
           : [],
 
         alternative_names: req.body.alternative_names
-          ? (typeof req.body.alternative_names === "string"
-              ? JSON.parse(req.body.alternative_names)
-              : req.body.alternative_names)
+          ? typeof req.body.alternative_names === "string"
+            ? JSON.parse(req.body.alternative_names)
+            : req.body.alternative_names
           : [],
         base_image: req.file?.filename,
       },
-      userId
+      userId,
     );
 
     res.json({ success: true, data: result });
-
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
 
-/**
- * UPDATE MAPPINGS (TRANSACIONAL)
- */
-export const updateProductMappings = async (req: AuthRequest, res: Response) => {
+export const updateProductMappings = async (
+  req: AuthRequest,
+  res: Response,
+) => {
   if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
   try {
@@ -108,7 +124,7 @@ export const updateProductMappings = async (req: AuthRequest, res: Response) => 
     const result = await service.updateProductMappings(
       Number(req.params.id),
       mappings,
-      userId
+      userId,
     );
     res.json({ success: true, data: result });
   } catch (error: any) {
@@ -139,7 +155,7 @@ export const updateMRP = async (req: AuthRequest, res: Response) => {
     const result = await service.updateMRP(
       Number(req.params.id),
       Number(req.body.mrp),
-      userId
+      userId,
     );
     res.json({ success: true, data: result });
   } catch (error: any) {
@@ -147,7 +163,10 @@ export const updateMRP = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const bulkUpdateProductMapping = async (req: AuthRequest, res: Response) => {
+export const bulkUpdateProductMapping = async (
+  req: AuthRequest,
+  res: Response,
+) => {
   if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
   try {
@@ -155,10 +174,17 @@ export const bulkUpdateProductMapping = async (req: AuthRequest, res: Response) 
     const { product_ids, mappings } = req.body;
 
     if (!product_ids || !mappings) {
-      return res.status(400).json({ success: false, message: "product_ids and mappings are required" });
+      return res.status(400).json({
+        success: false,
+        message: "product_ids and mappings are required",
+      });
     }
 
-    const result = await service.bulkUpdateMappings(product_ids, mappings, userId);
+    const result = await service.bulkUpdateMappings(
+      product_ids,
+      mappings,
+      userId,
+    );
     res.json({ success: true, data: result });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
@@ -170,7 +196,8 @@ export const generateProductQrPdf = async (req: AuthRequest, res: Response) => {
 
   try {
     const productId = Number(req.params.id);
-    const { filePath, fileName } = await service.generateProductQrPdf(productId);
+    const { filePath, fileName } =
+      await service.generateProductQrPdf(productId);
     res.download(filePath, fileName);
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
@@ -182,21 +209,23 @@ export const updateFullProduct = async (req: AuthRequest, res: Response) => {
 
   try {
     const userId = req.user.id;
-    const { product, mappings } = req.body;
+    const { product, mappings, alternative_names } = req.body;
 
-    const result = await service.updateFullProduct(product, mappings, userId);
+    const result = await service.updateFullProduct(
+      product,
+      mappings,
+      alternative_names,
+      userId,
+    );
 
     res.json({ success: true, data: result });
-
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
 
 export const createProductTax = async (req: AuthRequest, res: Response) => {
-
   try {
-
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -207,53 +236,40 @@ export const createProductTax = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json({
       success: true,
-      data: result
+      data: result,
     });
-
   } catch (error: any) {
-
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
-
   }
-
 };
-
 
 /* GET */
 
 export const getProductTax = async (_: Request, res: Response) => {
-
   const data = await service.fetchProductTax();
 
   res.json({
     success: true,
-    data
+    data,
   });
-
 };
 
-
 export const getProductTaxById = async (req: Request, res: Response) => {
-
   const data = await service.fetchProductTaxById(Number(req.params.id));
 
   res.json({
     success: true,
-    data
+    data,
   });
-
 };
-
 
 /* UPDATE */
 
 export const updateProductTax = async (req: AuthRequest, res: Response) => {
-
   try {
-
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -263,44 +279,34 @@ export const updateProductTax = async (req: AuthRequest, res: Response) => {
     const result = await service.updateProductTax(
       Number(req.params.id),
       req.body,
-      userId
+      userId,
     );
 
     res.json({
       success: true,
-      data: result
+      data: result,
     });
-
   } catch (error: any) {
-
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
-
   }
-
 };
-
 
 /* DELETE */
 
 export const deleteProductTax = async (req: AuthRequest, res: Response) => {
-
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const userId = req.user.id;
 
-  const result = await service.removeProductTax(
-    Number(req.params.id),
-    userId
-  );
+  const result = await service.removeProductTax(Number(req.params.id), userId);
 
   res.json({
     success: true,
-    data: result
+    data: result,
   });
-
 };

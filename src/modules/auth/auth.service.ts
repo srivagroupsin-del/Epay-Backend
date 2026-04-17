@@ -1,61 +1,76 @@
+import axios from "axios";
 import jwt from "jsonwebtoken";
 import * as authRepo from "./auth.repository";
 
-/**
- * Register user (PLAIN PASSWORD - TEMPORARY)
- */
-export const register = async (data: {
-  user_id: string;
-  name: string;
-  email: string;
-  password: string;
-}) => {
-  const existingUser = await authRepo.findUserByEmail(data.email);
-
-  if (existingUser) {
-    throw new Error("Email already registered");
-  }
-
-  // 🔴 STORE PASSWORD AS-IS (TEMPORARY)
-  await authRepo.createUser({
-    ...data,
-    password: data.password,
-  });
-
-  return { message: "User registered successfully" };
-};
-
-/**
- * Login user (PLAIN PASSWORD CHECK)
- */
 export const login = async (email: string, password: string) => {
-  const user = await authRepo.findUserByEmail(email);
+  try {
+    // 🔹 Call central API
+    const response = await axios.post(
+      "https://user.jobes24x7.com/api/login/authenticate",
+      { email, password },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      },
+    );
 
-  if (!user) {
-    throw new Error("Invalid email or password");
+    const apiData = response.data?.data;
+
+    if (!apiData || apiData.result !== "Success") {
+      throw new Error("Invalid login");
+    }
+
+    const userData = apiData.data;
+    const centralToken = apiData.token;
+    const expiryISO = apiData.expires_at;
+
+    // 🔥 Convert ISO → MySQL DATETIME
+    const expiry = new Date(expiryISO)
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+
+    // 🔹 Find or create user
+    let user = await authRepo.findUserByEmail(userData.email);
+
+    if (!user) {
+      const newUserId = await authRepo.createUser({
+        user_id: userData.user_main_id,
+        name: userData.user_name,
+        email: userData.email,
+        password: "external_auth",
+      });
+
+      user = {
+        id: newUserId,
+        email: userData.email,
+      };
+    } else {
+      await authRepo.updateUserMainId(user.id, userData.user_main_id);
+    }
+
+    // 🔥 ALWAYS SAVE CENTRAL TOKEN (FIXED)
+    await authRepo.updateCentralToken(user.id, centralToken, expiry);
+
+    // 🔹 Generate YOUR token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        user_id: userData.user_main_id, // 🔥 IMPORTANT
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1d" },
+    );
+
+    return {
+      token,
+      user,
+    };
+  } catch (err: any) {
+    console.error(err.response?.data || err.message);
+    throw new Error("Login failed");
   }
-
-  if (!user.is_active || user.status !== "active") {
-    throw new Error("User is disabled or blocked");
-  }
-
-  // 🔴 PLAIN PASSWORD CHECK (TEMPORARY)
-  if (password !== user.password) {
-    throw new Error("Invalid email or password");
-  }
-
-  const token = jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      business_id: user.details?.business_id || user.add_json?.business_id || null,
-    },
-    process.env.JWT_SECRET as string,
-    { expiresIn: "1d" }
-  );
-
-  return {
-    token,
-    user: user
-  };
 };
