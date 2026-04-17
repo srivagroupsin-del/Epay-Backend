@@ -12,5 +12,6 @@ export default router;
 // {
 //   "service_name": "PANEL_ADMIN",
 //   "platform_type": "WEB",
-//   "api_key": "my_custom_secure_key_123"
+//   "api_key": "prod_key_123456",
+//   "expires_at": "2026-04-17 15:00:00"
 // }

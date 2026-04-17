@@ -11,46 +11,51 @@ export const verifyApiKey = async (
     const serviceName = req.header("x-service-name");
     const platform = req.header("x-platform");
 
+    // 🔴 Missing headers
     if (!apiKey || !serviceName || !platform) {
       return res.status(400).json({
-        message: "Missing API Key / Service / Platform",
+        success: false,
+        message: "API authentication headers are missing",
       });
     }
 
+    // 🔍 Validate API key
     const [rows]: any = await apiDb.query(
-      `SELECT * FROM api_keys 
+      `SELECT id FROM api_keys 
        WHERE api_key=? 
        AND service_name=? 
        AND platform_type=? 
-       AND is_active=1`,
+       AND is_active=1
+       AND expires_at > NOW()`,
       [apiKey, serviceName, platform],
     );
 
-    if (rows.length === 0) {
-      return res.status(403).json({ message: "Invalid API Key" });
-    }
-
-    const keyData = rows[0];
-
-    // ⛔ expiry check
-    if (new Date() > new Date(keyData.expires_at)) {
-      await apiDb.query("UPDATE api_keys SET is_active=0 WHERE id=?", [
-        keyData.id,
-      ]);
-
-      return res.status(401).json({
-        message: "API Key Expired",
+    // 🔴 Invalid / expired key
+    if (!rows || rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Invalid or expired API key",
       });
     }
 
-    // update usage
-    await apiDb.query("UPDATE api_keys SET last_used_at=NOW() WHERE id=?", [
-      keyData.id,
-    ]);
+    const keyId = rows[0].id;
+
+    // 🔄 Update last usage (non-blocking best practice)
+    apiDb
+      .query("UPDATE api_keys SET last_used_at=NOW() WHERE id=?", [keyId])
+      .catch(() => {
+        // silently ignore logging errors
+      });
 
     next();
   } catch (err) {
-    console.error("API KEY ERROR:", err);
-    res.status(500).json({ message: "Internal Server Error" });
+    // ❗ Log only in backend
+    console.error("API KEY MIDDLEWARE ERROR:", err);
+
+    // 🔒 Safe response (no internal details)
+    return res.status(500).json({
+      success: false,
+      message: "Unable to validate API key",
+    });
   }
 };
