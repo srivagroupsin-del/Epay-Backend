@@ -4,7 +4,7 @@ import apiDb from "../config/api_key_validation";
 export const startApiKeyExpiryJob = () => {
   console.log("API Key Expiry Cron Started");
 
-  cron.schedule("* * * * *", async () => {
+  cron.schedule("*/5 * * * *", async () => {
     try {
       const [result]: any = await apiDb.query(`
         UPDATE api_keys 

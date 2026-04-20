@@ -21,6 +21,7 @@ import businessCategoryGroupRoutes from "./modules/businessCategoryGroup/busines
 
 // Multitab Routes
 import MultitabRoutes from "./modules/multitab/multitab.routes";
+import multitabFieldsRoutes from "./modules/multitab-fields/multitab-fields.routes";
 
 import categoryGroupMappingRoutes from "./modules/category-group-mapping/categoryGroupMapping.route";
 import variantRoutes from "./modules/varients_feilds/varients_routes";
@@ -49,7 +50,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // JSON parser
 app.use(express.json());
 
-startApiKeyExpiryJob();
+// startApiKeyExpiryJob();
 
 // Response time logger
 app.use(
@@ -97,6 +98,7 @@ app.use("/api/categoryGroupMapping", categoryGroupMappingRoutes);
 app.use("/api/businessCategoryGroup", businessCategoryGroupRoutes);
 app.use("/api/variant", variantRoutes);
 app.use("/api/multitab", MultitabRoutes);
+app.use("/api", multitabFieldsRoutes);
 
 // Static uploads
 app.use("/uploads", express.static("uploads"));

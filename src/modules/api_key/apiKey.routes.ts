@@ -1,17 +1,17 @@
 import express from "express";
-import { generateApiKey } from "../api_key/apiKey.controller";
-// import { authMiddleware } from "../../middlewares/auth.middlewares";
+import {
+  createOrUpdateApiKey,
+  getAllApiKeys,
+  getApiKeyByService,
+  getApiKeyLogs,
+} from "./apiKey.controller";
 
 const router = express.Router();
 
-// 🔐 only admin should generate API key
-router.post("/generate", generateApiKey);
+router.post("/generate", createOrUpdateApiKey);
+router.get("/logs", getApiKeyLogs);
+
+router.get("/", getAllApiKeys);
+router.get("/:service_name/:platform_type", getApiKeyByService);
 
 export default router;
-
-// {
-//   "service_name": "PANEL_ADMIN",
-//   "platform_type": "WEB",
-//   "api_key": "prod_key_123456",
-//   "expires_at": "2026-04-17 15:00:00"
-// }

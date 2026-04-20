@@ -1,69 +1,74 @@
 import { Request, Response } from "express";
-import apiDb from "../../config/api_key_validation";
+import * as service from "./apiKey.service";
 
-export const generateApiKey = async (req: Request, res: Response) => {
+// ➕ CREATE / UPDATE
+export const createOrUpdateApiKey = async (req: Request, res: Response) => {
   try {
-    const { service_name, platform_type, api_key, expires_at } = req.body;
-
-    if (!service_name || !platform_type || !api_key || !expires_at) {
-      return res.status(400).json({
-        message: "service_name, platform_type, api_key, expires_at required",
-      });
-    }
-
-    // 🔍 check existing
-    const [rows]: any = await apiDb.query(
-      `SELECT * FROM api_keys 
-       WHERE service_name=? AND platform_type=?`,
-      [service_name, platform_type],
-    );
-
-    if (rows.length > 0) {
-      const oldKey = rows[0].api_key;
-
-      // 🔄 UPDATE
-      await apiDb.query(
-        `UPDATE api_keys 
-         SET api_key=?, 
-             expires_at=?, 
-             is_active=1,
-             updated_at=NOW()
-         WHERE service_name=? AND platform_type=?`,
-        [api_key, expires_at, service_name, platform_type],
-      );
-
-      // 📝 LOG
-      await apiDb.query(
-        `INSERT INTO api_key_logs 
-         (service_name, platform_type, old_api_key, new_api_key, changed_by)
-         VALUES (?, ?, ?, ?, ?)`,
-        [service_name, platform_type, oldKey, api_key, "ADMIN"],
-      );
-
-      return res.json({
-        success: true,
-        message: "API Key updated",
-        api_key,
-        expires_at,
-      });
-    } else {
-      // ➕ INSERT
-      await apiDb.query(
-        `INSERT INTO api_keys 
-         (service_name, platform_type, api_key, expires_at, is_active)
-         VALUES (?, ?, ?, ?, 1)`,
-        [service_name, platform_type, api_key, expires_at],
-      );
-
-      return res.json({
-        success: true,
-        message: "API Key created",
-        api_key,
-        expires_at,
-      });
-    }
-  } catch (err) {
+    const result = await service.createOrUpdate(req.body);
+    return res.json({ success: true, ...result });
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Internal Server Error",
+    });
+  }
+};
+
+// 📥 GET ALL
+export const getAllApiKeys = async (_: Request, res: Response) => {
+  try {
+    const data = await service.getAll();
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Error fetching data" });
+  }
+};
+
+// 🔍 GET ONE
+export const getApiKeyByService = async (req: Request, res: Response) => {
+  try {
+    const service_name = req.params.service_name as string;
+    const platform_type = req.params.platform_type as string;
+
+    if (!service_name || !platform_type) {
+      return res.status(400).json({
+        success: false,
+        message: "service_name and platform_type required",
+      });
+    }
+
+    const data = await service.getOne(service_name, platform_type);
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching data",
+    });
+  }
+};
+
+// 📜 LOGS
+export const getApiKeyLogs = async (_: Request, res: Response) => {
+  try {
+    const data = await service.getLogs();
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Error fetching logs" });
   }
 };
