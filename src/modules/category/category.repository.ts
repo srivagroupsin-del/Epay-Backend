@@ -11,20 +11,7 @@ export const getCategoryById = async (id: number) => {
   return row || null;
 };
 
-export const getAllCategories = async (
-  limit: number,
-  offset: number,
-  search: string,
-) => {
-  let where = `WHERE c.is_active = 1`;
-  const values: any[] = [];
-
-  // 🔥 ADD THIS
-  if (search) {
-    where += ` AND c.category_name LIKE ?`;
-    values.push(`%${search}%`);
-  }
-
+export const getAllCategories = async () => {
   const query = `
     SELECT	
         c.id,
@@ -65,17 +52,12 @@ export const getAllCategories = async (
         ON pc.id = c.parent_category_id
         AND pc.is_active = 1
 
-    ${where}
+    WHERE c.is_active = 1
 
     ORDER BY c.id DESC
-
-    LIMIT ? OFFSET ?
   `;
 
-  values.push(Number(limit), Number(offset));
-
-  const [rows] = await pool.query(query, values);
-
+  const [rows] = await pool.query(query);
   return rows;
 };
 

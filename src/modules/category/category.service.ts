@@ -4,11 +4,7 @@ import path from "path";
 import { logAudit } from "../audit/audit.service";
 import { ensureUniqueActive } from "../../utils/uniqueCheck";
 /* GET */
-export const fetchCategories = async (
-  limit: number,
-  offset: number,
-  search: string,
-) => repo.getAllCategories(limit, offset, search);
+export const fetchCategories = async () => repo.getAllCategories();
 
 export const fetchPrimaryCategories = async () => repo.getPrimaryCategories();
 

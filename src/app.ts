@@ -74,7 +74,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin/api-key", apiKeyRoutes);
 
 // 🔑 Apply API key globally
-app.use("/api", verifyApiKey);
+// app.use("/api", verifyApiKey);
 
 // 🔐 All protected routes
 app.use("/api", authMiddleware);
