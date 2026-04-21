@@ -4,10 +4,11 @@ import * as f from "./multitab-fields.controller";
 const r = Router();
 
 /* FIELDS */
-r.post("/multitab-fields", f.createField);
-r.get("/multitab-fields", f.getFields);
-r.get("/multitab-fields/:id", f.getFieldById);
-r.put("/multitab-fields/:id", f.updateField);
-r.delete("/multitab-fields/:id", f.deleteField);
+r.get("/ui", f.getFieldsForUI);
+r.post("/", f.createField);
+r.get("/", f.getFields);
+r.get("/:id", f.getFieldById);
+r.put("/:id", f.updateField);
+r.delete("/:id", f.deleteField);
 
 export default r;

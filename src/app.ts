@@ -22,6 +22,7 @@ import businessCategoryGroupRoutes from "./modules/businessCategoryGroup/busines
 // Multitab Routes
 import MultitabRoutes from "./modules/multitab/multitab.routes";
 import multitabFieldsRoutes from "./modules/multitab-fields/multitab-fields.routes";
+import multitabconfig from "./modules/multitab-config/multitab-config.routes";
 
 import categoryGroupMappingRoutes from "./modules/category-group-mapping/categoryGroupMapping.route";
 import variantRoutes from "./modules/varients_feilds/varients_routes";
@@ -98,7 +99,8 @@ app.use("/api/categoryGroupMapping", categoryGroupMappingRoutes);
 app.use("/api/businessCategoryGroup", businessCategoryGroupRoutes);
 app.use("/api/variant", variantRoutes);
 app.use("/api/multitab", MultitabRoutes);
-app.use("/api", multitabFieldsRoutes);
+app.use("/api/multitab-fields", multitabFieldsRoutes);
+app.use("/api/multitab-config", multitabconfig);
 
 // Static uploads
 app.use("/uploads", express.static("uploads"));

@@ -3,6 +3,9 @@ import pool from "../../config/db";
 /* ===============================
    CREATE PRODUCT + MAPPINGS
 ================================ */
+/* ===============================
+   CREATE PRODUCT + MAPPINGS + DYNAMIC FIELDS
+================================ */
 export const createProduct = async (data: any) => {
   if (!Array.isArray(data.mappings) || data.mappings.length === 0) {
     throw new Error("At least one category-brand mapping is required");
@@ -42,22 +45,7 @@ export const createProduct = async (data: any) => {
 
     const productId = result.insertId;
 
-    if (
-      Array.isArray(data.alternative_names) &&
-      data.alternative_names.length
-    ) {
-      const altValues = data.alternative_names.map((name: string) => [
-        productId,
-        name,
-      ]);
-
-      await conn.query(
-        `INSERT INTO product_alternative_names (product_id, alternative_name)
-        VALUES ?`,
-        [altValues],
-      );
-    }
-
+    /* 🔥 SAVE MAPPINGS */
     const values = data.mappings.map((id: number) => [productId, id]);
 
     await conn.query(
@@ -65,6 +53,23 @@ export const createProduct = async (data: any) => {
        VALUES ?`,
       [values],
     );
+
+    /* 🔥 SAVE DYNAMIC FIELDS */
+    if (Array.isArray(data.dynamic_fields) && data.dynamic_fields.length) {
+      const dynamicValues = data.dynamic_fields.map((f: any) => [
+        productId,
+        f.mapping_id, // 🔥 ADD THIS
+        f.field_id,
+        f.value,
+      ]);
+
+      await conn.query(
+        `INSERT INTO product_dynamic_fields 
+         (product_id, category_brand_id, field_id, value)
+         VALUES ?`,
+        [dynamicValues],
+      );
+    }
 
     await conn.commit();
     return productId;
@@ -205,7 +210,12 @@ export const getProductById = async (id: number) => {
       pc.id AS primary_category_id,
       pc.category_name AS primary_category_name,
       b.id AS brand_id,
-      b.brand_name
+      b.brand_name,
+
+      pdf.field_id,
+      pdf.value,
+      f.field_name,
+      f.display_name
 
     FROM product p
 
@@ -226,6 +236,13 @@ export const getProductById = async (id: number) => {
 
     LEFT JOIN brand b
       ON b.id = cb.brand_id
+
+    LEFT JOIN product_dynamic_fields pdf 
+    ON pdf.product_id = p.id 
+    AND pdf.category_brand_id = pcb.category_brand_id
+
+    LEFT JOIN multitab_fields f
+    ON f.id = pdf.field_id
 
     WHERE p.id = ?
       AND p.is_active = 1
@@ -400,6 +417,45 @@ export const updateProductMappings = async (
        VALUES ?`,
       [values],
     );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+export const updateProductDynamicFields = async (
+  productId: number,
+  fields: any[],
+) => {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    await conn.query(
+      `DELETE FROM product_dynamic_fields WHERE product_id = ?`,
+      [productId],
+    );
+
+    if (fields.length) {
+      const values = fields.map((f) => [
+        productId,
+        f.mapping_id, // 🔥 REQUIRED
+        f.field_id,
+        f.value,
+      ]);
+
+      await conn.query(
+        `INSERT INTO product_dynamic_fields 
+        (product_id, category_brand_id, field_id, value)
+        VALUES ?`,
+        [values],
+      );
+    }
 
     await conn.commit();
   } catch (err) {

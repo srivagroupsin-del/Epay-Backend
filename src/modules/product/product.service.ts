@@ -13,6 +13,7 @@ import { ensureUniqueActive } from "../../utils/uniqueCheck";
 export const fetchProducts = async (params: any) => {
   return repo.getProducts(params);
 };
+
 /* =========================================
    FETCH SINGLE PRODUCT
 ========================================= */
@@ -22,6 +23,8 @@ export const fetchProductById = async (id: number) => {
   if (!rows || rows.length === 0) {
     throw new Error("Product not found");
   }
+
+  const dynamicMap = new Map<string, any>(); // ✅ FIXED
 
   const first = rows[0];
 
@@ -65,9 +68,26 @@ export const fetchProductById = async (id: number) => {
         brand_name: row.brand_name,
       });
     }
+
+    // 🔥 FIXED DYNAMIC FIELD LOGIC
+    if (row.field_id) {
+      const key = `${row.mapping_id}_${row.field_id}`;
+
+      if (!dynamicMap.has(key)) {
+        dynamicMap.set(key, {
+          mapping_id: row.mapping_id,
+          field_id: row.field_id,
+          field_name: row.field_name,
+          display_name: row.display_name,
+          value: row.value,
+        });
+      }
+    }
   }
 
   product.alternative_names = Array.from(altSet);
+
+  (product as any).dynamic_fields = Array.from(dynamicMap.values());
 
   return product;
 };
@@ -117,6 +137,11 @@ export const updateProduct = async (id: number, data: any, userId: number) => {
   if (Array.isArray(data.mappings) && data.mappings.length > 0) {
     const resolvedMappingIds = await resolveMappings(data.mappings);
     await repo.updateProductMappings(id, resolvedMappingIds);
+  }
+
+  // 🔥 ADD THIS
+  if (Array.isArray(data.dynamic_fields)) {
+    await repo.updateProductDynamicFields(id, data.dynamic_fields);
   }
 
   await logAudit({
@@ -354,6 +379,11 @@ export const updateFullProduct = async (
 
     // 1️⃣ product
     await repo.updateProductTx(product.id, product);
+
+    // 🔥 ADD THIS BEFORE commit
+    if (product.dynamic_fields) {
+      await repo.updateProductDynamicFields(product.id, product.dynamic_fields);
+    }
 
     // 2️⃣ alternative names
     await conn.query(

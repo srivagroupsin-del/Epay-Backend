@@ -69,6 +69,12 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
             ? JSON.parse(req.body.alternative_names)
             : req.body.alternative_names
           : [],
+        // 🔥 ADD THIS
+        dynamic_fields: req.body.dynamic_fields
+          ? typeof req.body.dynamic_fields === "string"
+            ? JSON.parse(req.body.dynamic_fields)
+            : req.body.dynamic_fields
+          : [],
         base_image: req.file?.filename,
       },
       userId,
@@ -99,6 +105,12 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
           ? typeof req.body.alternative_names === "string"
             ? JSON.parse(req.body.alternative_names)
             : req.body.alternative_names
+          : [],
+        // 🔥 ADD THIS
+        dynamic_fields: req.body.dynamic_fields
+          ? typeof req.body.dynamic_fields === "string"
+            ? JSON.parse(req.body.dynamic_fields)
+            : req.body.dynamic_fields
           : [],
         base_image: req.file?.filename,
       },

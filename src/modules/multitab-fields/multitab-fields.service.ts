@@ -34,3 +34,9 @@ export const deleteField = async (id: number, u: number) => {
     action: "delete",
   });
 };
+
+export const getFieldsForUI = async (d: any) => {
+  const checkbox_ids = d.checkbox_ids || [];
+
+  return await repo.getFieldsForSelection(d.heading_id, checkbox_ids);
+};
