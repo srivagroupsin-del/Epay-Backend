@@ -2,6 +2,22 @@ import * as repo from "./multitab-config.repository";
 import { logAudit } from "../audit/audit.service";
 import pool from "../../config/db";
 
+const parseOptions = (opt: any) => {
+  try {
+    if (!opt) return [];
+
+    if (Array.isArray(opt)) return opt;
+
+    if (typeof opt === "string") {
+      return JSON.parse(opt);
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+};
+
 /* VALIDATION */
 const validateConfig = (d: any) => {
   if (!d.heading_id) throw new Error("heading_id required");
@@ -88,7 +104,10 @@ export const getFieldsByHierarchy = async (d: any) => {
     const catId = f.category_id || "global";
 
     if (!grouped[catId]) grouped[catId] = [];
-    grouped[catId].push(f);
+    grouped[catId].push({
+      ...f,
+      options: parseOptions(f.options),
+    });
   });
 
   return grouped;

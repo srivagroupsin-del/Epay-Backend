@@ -97,8 +97,28 @@ export const getProducts = async ({
 
   // 🔍 SEARCH
   if (search) {
-    where += ` AND (p.product_name LIKE ? OR p.model LIKE ?)`;
-    values.push(`%${search}%`, `%${search}%`);
+    where += `
+    AND (
+      p.product_name LIKE ?
+      OR p.model LIKE ?
+
+      -- 🔥 ALTERNATIVE NAMES
+      OR EXISTS (
+        SELECT 1 FROM product_alternative_names pan
+        WHERE pan.product_id = p.id
+        AND pan.alternative_name LIKE ?
+      )
+
+      -- 🔥 DYNAMIC FIELDS (barcode, gst, etc.)
+      OR EXISTS (
+        SELECT 1 FROM product_dynamic_fields pdf
+        WHERE pdf.product_id = p.id
+        AND pdf.value LIKE ?
+      )
+    )
+  `;
+
+    values.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   // 🏷️ BRAND FILTER
