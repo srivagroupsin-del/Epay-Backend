@@ -72,3 +72,22 @@ export const getLogs = async () => {
   );
   return rows;
 };
+
+// ✅ GET ACTIVE KEY (SAFE)
+export const getActiveKey = async (
+  service_name: string,
+  platform_type: string,
+) => {
+  const [rows]: any = await apiDb.query(
+    `SELECT api_key 
+     FROM api_keys 
+     WHERE service_name = ?
+       AND platform_type = ?
+       AND is_active = 1
+       AND expires_at > NOW()
+     LIMIT 1`,
+    [service_name, platform_type],
+  );
+
+  return rows[0]; // only api_key
+};

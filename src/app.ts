@@ -19,6 +19,8 @@ import dynamicRoutes from "./modules/dynamic/dynamic.routes";
 import categoryGroupRoutes from "./modules/category-title/categoryGroup.route";
 import businessCategoryGroupRoutes from "./modules/businessCategoryGroup/businessCategoryGroup.routes";
 
+import outsideapis from "./modules/outsideapis/outsideapis.routes";
+
 // Multitab Routes
 import MultitabRoutes from "./modules/multitab/multitab.routes";
 import multitabFieldsRoutes from "./modules/multitab-fields/multitab-fields.routes";
@@ -76,6 +78,8 @@ app.use("/api/admin/api-key", apiKeyRoutes);
 
 // 🔑 Apply API key globally
 // app.use("/api", verifyApiKey);
+
+app.use("/api/outsideapis", outsideapis);
 
 // 🔐 All protected routes
 app.use("/api", authMiddleware);

@@ -4,9 +4,13 @@ import {
   getAllApiKeys,
   getApiKeyByService,
   getApiKeyLogs,
+  getPublicApiKey,
 } from "./apiKey.controller";
 
 const router = express.Router();
+
+// 🔓 PUBLIC ROUTE (NO API KEY MIDDLEWARE)
+router.get("/public/api-key", getPublicApiKey);
 
 router.post("/generate", createOrUpdateApiKey);
 router.get("/logs", getApiKeyLogs);

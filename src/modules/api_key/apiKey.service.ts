@@ -49,3 +49,21 @@ export const getOne = async (service_name: string, platform_type: string) => {
 export const getLogs = async () => {
   return await repo.getLogs();
 };
+
+// ✅ GET ACTIVE KEY
+export const getActiveApiKey = async (
+  service_name: string,
+  platform_type: string,
+) => {
+  if (!service_name || !platform_type) {
+    throw new Error("service_name and platform_type required");
+  }
+
+  const keyData = await repo.getActiveKey(service_name, platform_type);
+
+  if (!keyData) {
+    throw new Error("No active API key found");
+  }
+
+  return keyData;
+};
