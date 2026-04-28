@@ -4,9 +4,6 @@ export const fetchProducts = async (params: any) => {
   return repo.getProducts(params);
 };
 
-/* =========================================
-   FETCH SINGLE PRODUCT
-========================================= */
 export const fetchProductById = async (id: number) => {
   const rows = await repo.getProductById(id);
 
@@ -80,4 +77,16 @@ export const fetchProductById = async (id: number) => {
   (product as any).dynamic_fields = Array.from(dynamicMap.values());
 
   return product;
+};
+
+export const fetchProductKeys = async () => {
+  return repo.productUrlKey();
+};
+
+export const fetchProductMappings = async (
+  search: string = "",
+  page: number = 1,
+  limit: number = 20,
+) => {
+  return repo.getProductsWithMappings(search, page, limit);
 };

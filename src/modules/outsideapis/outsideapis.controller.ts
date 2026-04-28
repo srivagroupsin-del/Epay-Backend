@@ -38,3 +38,40 @@ export const getProductById = async (req: Request, res: Response) => {
     res.status(404).json({ success: false, message: error.message });
   }
 };
+
+export const getProductKeys = async (req: Request, res: Response) => {
+  try {
+    const result = await service.fetchProductKeys();
+
+    res.json({
+      success: true,
+      keys: result.keys,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getProductMappings = async (req: Request, res: Response) => {
+  try {
+    // 🔹 Read query params
+    const search = (req.query.search as string) || "";
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 30;
+
+    const data = await service.fetchProductMappings(search, page, limit);
+
+    res.json({
+      success: true,
+      ...data, // includes data + pagination
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
