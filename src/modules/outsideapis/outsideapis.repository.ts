@@ -227,14 +227,11 @@ export const productUrlKey = async () => {
   };
 };
 
-export const getProductsWithMappings = async (
-  search: string = "",
-  page: number = 1,
-  limit: number = 20,
-) => {
-  const offset = (page - 1) * limit;
+export const getProductsWithMappings = async (search: string = "") => {
+  // 🔒 Safety
+  search = search?.trim() || "";
 
-  // 🔍 Search condition
+  // 🔍 Search
   const searchQuery = search
     ? `AND (
         p.product_name LIKE ? OR
@@ -277,10 +274,7 @@ SELECT
     
     p.id AS product_id,
     p.product_name,
-    p.description AS product_description,
-    
-    pcb.id AS product_mapping_id,
-    cb.id AS category_brand_mapping_id
+    p.description AS product_description
 
 FROM product p
 
@@ -312,13 +306,11 @@ ORDER BY
     secondary_category_name ASC,
     b.brand_name ASC,
     p.product_name ASC
-
-LIMIT ? OFFSET ?
 `,
-    [...searchParams, limit, offset],
+    [...searchParams],
   );
 
-  // 🔹 TOTAL COUNT (for pagination)
+  // 🔹 COUNT
   const [countResult]: any = await pool.query(
     `
 SELECT COUNT(DISTINCT p.id) as total
@@ -334,13 +326,94 @@ ${searchQuery}
     searchParams,
   );
 
+  // 🌳 TREE BUILD
+  const categoryMap = new Map();
+
+  for (const row of rows) {
+    // ❗ only skip if product missing
+    if (!row.product_id) continue;
+
+    const primaryId = row.primary_category_id || 0;
+
+    if (!categoryMap.has(primaryId)) {
+      categoryMap.set(primaryId, {
+        primary_category_id: primaryId,
+        primary_category_name: row.primary_category_name || "Uncategorized",
+        primary_category_description: row.primary_category_description,
+        secondary_categories: new Map(),
+        brands: new Map(),
+      });
+    }
+
+    const category = categoryMap.get(primaryId);
+
+    // 🔸 WITH SECONDARY CATEGORY
+    if (row.secondary_category_id) {
+      if (!category.secondary_categories.has(row.secondary_category_id)) {
+        category.secondary_categories.set(row.secondary_category_id, {
+          secondary_category_id: row.secondary_category_id,
+          secondary_category_name: row.secondary_category_name,
+          secondary_category_description: row.secondary_category_description,
+          brands: new Map(),
+        });
+      }
+
+      const sec = category.secondary_categories.get(row.secondary_category_id);
+
+      const brandId = row.brand_id || 0;
+
+      if (!sec.brands.has(brandId)) {
+        sec.brands.set(brandId, {
+          brand_id: row.brand_id,
+          brand_name: row.brand_name || "No Brand",
+          brand_description: row.brand_description,
+          products: [],
+        });
+      }
+
+      sec.brands.get(brandId).products.push({
+        product_id: row.product_id,
+        product_name: row.product_name,
+        product_description: row.product_description,
+      });
+    } else {
+      // 🔸 DIRECT UNDER PRIMARY
+      const brandId = row.brand_id || 0;
+
+      if (!category.brands.has(brandId)) {
+        category.brands.set(brandId, {
+          brand_id: row.brand_id,
+          brand_name: row.brand_name || "No Brand",
+          brand_description: row.brand_description,
+          products: [],
+        });
+      }
+
+      category.brands.get(brandId).products.push({
+        product_id: row.product_id,
+        product_name: row.product_name,
+        product_description: row.product_description,
+      });
+    }
+  }
+
+  // 🔄 Convert Maps → Arrays
+  const finalData = Array.from(categoryMap.values()).map((cat: any) => ({
+    primary_category_id: cat.primary_category_id,
+    primary_category_name: cat.primary_category_name,
+    primary_category_description: cat.primary_category_description,
+
+    secondary_categories: Array.from(cat.secondary_categories.values()).map(
+      (sec: any) => ({
+        ...sec,
+        brands: Array.from(sec.brands.values()),
+      }),
+    ),
+
+    brands: Array.from(cat.brands.values()),
+  }));
+
   return {
-    data: rows,
-    pagination: {
-      total: countResult[0].total,
-      page,
-      limit,
-      totalPages: Math.ceil(countResult[0].total / limit),
-    },
+    data: finalData,
   };
 };

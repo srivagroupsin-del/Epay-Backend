@@ -1,18 +1,18 @@
 import axios from "axios";
 import jwt from "jsonwebtoken";
 import * as authRepo from "./auth.repository";
+import { getAuthHeaders } from "../../utils/getAuthHeaders";
 
 export const login = async (email: string, password: string) => {
   try {
+    const headers = await getAuthHeaders();
     // 🔹 Call central API
     const response = await axios.post(
       "https://user.jobes24x7.com/api/login/authenticate",
       { email, password },
       {
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers,
+        timeout: 5000, // 🔥 IMPORTANT
       },
     );
 
@@ -23,6 +23,13 @@ export const login = async (email: string, password: string) => {
     }
 
     const userData = apiData.data;
+
+    if (!userData?.email) {
+      throw new Error("Invalid user data from central API");
+    }
+
+    console.log("Login success for:", userData.email);
+
     const centralToken = apiData.token;
     const expiryISO = apiData.expires_at;
 

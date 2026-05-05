@@ -83,10 +83,6 @@ export const fetchProductKeys = async () => {
   return repo.productUrlKey();
 };
 
-export const fetchProductMappings = async (
-  search: string = "",
-  page: number = 1,
-  limit: number = 20,
-) => {
-  return repo.getProductsWithMappings(search, page, limit);
+export const fetchProductMappings = async (search: string = "") => {
+  return repo.getProductsWithMappings(search);
 };

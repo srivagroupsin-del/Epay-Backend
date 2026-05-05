@@ -2,6 +2,7 @@ import * as repo from "./businessCategoryGroup.repository";
 import * as authRepo from "../../modules/auth/auth.repository";
 import { logAudit } from "../audit/audit.service";
 import axios from "axios";
+import { getAuthHeaders } from "../../utils/getAuthHeaders";
 
 /* =========================
    CREATE
@@ -49,10 +50,13 @@ export const getBusinessCategoryGroups = async (
   }
 
   try {
+    const headers = await getAuthHeaders();
     const response = await axios.get(
       `https://user.jobes24x7.com/api/business-cre/main/${user.user_id}`,
       {
         headers: {
+          ...headers,
+
           Authorization: `Bearer ${user.central_token}`,
           Accept: "application/json",
         },

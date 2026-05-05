@@ -59,10 +59,7 @@ export const getProductMappings = async (req: Request, res: Response) => {
   try {
     // 🔹 Read query params
     const search = (req.query.search as string) || "";
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 30;
-
-    const data = await service.fetchProductMappings(search, page, limit);
+    const data = await service.fetchProductMappings(search);
 
     res.json({
       success: true,
