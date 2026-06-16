@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as service from "./outsideapis.service";
 import { AuthRequest } from "../../middlewares/auth.middlewares";
+import { getBaseUrl, mapProductImageFields } from "../../utils/imageUrl";
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
@@ -17,10 +18,12 @@ export const getProducts = async (req: Request, res: Response) => {
     };
 
     const result = await service.fetchProducts(params);
+    const baseUrl = getBaseUrl(req);
+    const mappedData = (result.data as any[]).map((item: any) => mapProductImageFields(item, baseUrl));
 
     res.json({
       success: true,
-      data: result.data,
+      data: mappedData,
       total: result.total,
       page,
       limit,
@@ -33,7 +36,9 @@ export const getProducts = async (req: Request, res: Response) => {
 export const getProductById = async (req: Request, res: Response) => {
   try {
     const data = await service.fetchProductById(Number(req.params.id));
-    res.json({ success: true, data });
+    const baseUrl = getBaseUrl(req);
+    const mappedData = mapProductImageFields(data, baseUrl);
+    res.json({ success: true, data: mappedData });
   } catch (error: any) {
     res.status(404).json({ success: false, message: error.message });
   }
@@ -59,7 +64,8 @@ export const getProductMappings = async (req: Request, res: Response) => {
   try {
     // 🔹 Read query params
     const search = (req.query.search as string) || "";
-    const data = await service.fetchProductMappings(search);
+    const baseUrl = getBaseUrl(req);
+    const data = await service.fetchProductMappings(search, baseUrl);
 
     res.json({
       success: true,
@@ -70,5 +76,17 @@ export const getProductMappings = async (req: Request, res: Response) => {
       success: false,
       message: error.message,
     });
+  }
+};
+
+export const updateMRP = async (req: Request, res: Response) => {
+  try {
+    const result = await service.updateMRP(
+      Number(req.params.id),
+      Number(req.body.mrp),
+    );
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(400).json({ success: false, message: error.message });
   }
 };

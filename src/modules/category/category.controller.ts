@@ -2,28 +2,35 @@ import { Request, Response } from "express";
 import * as service from "./category.service";
 import fs from "fs";
 import { AuthRequest } from "../../middlewares/auth.middlewares";
+import { getBaseUrl, mapEntityImageFields } from "../../utils/imageUrl";
 
 /* GET */
 export const getCategories = async (req: Request, res: Response) => {
   try {
     const data = await service.fetchCategories();
+    const baseUrl = getBaseUrl(req);
+    const mappedData = (data as any[]).map(item => mapEntityImageFields(item, baseUrl));
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: mappedData });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-export const getPrimaryCategories = async (_: Request, res: Response) => {
+export const getPrimaryCategories = async (req: Request, res: Response) => {
   const data = await service.fetchPrimaryCategories();
-  res.json({ success: true, data });
+  const baseUrl = getBaseUrl(req);
+  const mappedData = (data as any[]).map(item => mapEntityImageFields(item, baseUrl));
+  res.json({ success: true, data: mappedData });
 };
 
 export const getSecondaryCategories = async (req: Request, res: Response) => {
   const data = await service.fetchSecondaryCategories(
     Number(req.params.parentId),
   );
-  res.json({ success: true, data });
+  const baseUrl = getBaseUrl(req);
+  const mappedData = (data as any[]).map(item => mapEntityImageFields(item, baseUrl));
+  res.json({ success: true, data: mappedData });
 };
 
 /* CREATE */
@@ -128,7 +135,9 @@ export const getUnselectedSecondaryCategories = async (
   }
 
   const data = await service.fetchUnselectedSecondaryCategories(primaryId);
-  res.json({ success: true, data });
+  const baseUrl = getBaseUrl(req);
+  const mappedData = (data as any[]).map(item => mapEntityImageFields(item, baseUrl));
+  res.json({ success: true, data: mappedData });
 };
 
 export const bulkToSecondary = async (req: AuthRequest, res: Response) => {

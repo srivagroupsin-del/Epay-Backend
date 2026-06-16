@@ -10,7 +10,7 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// Test connection
+
 export const checkDBConnection = async () => {
   try {
     const connection = await pool.getConnection();
@@ -22,3 +22,4 @@ export const checkDBConnection = async () => {
 };
 
 export default pool;
+

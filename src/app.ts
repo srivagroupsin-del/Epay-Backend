@@ -26,14 +26,12 @@ import businessCategoryGroupRoutes from "./modules/businessCategoryGroup/busines
 
 import outsideapis from "./modules/outsideapis/outsideapis.routes";
 
-// Multitab Routes
-import MultitabRoutes from "./modules/multitab/multitab.routes";
-import multitabFieldsRoutes from "./modules/multitab-fields/multitab-fields.routes";
-import multitabconfig from "./modules/multitab-config/multitab-config.routes";
-
 import categoryGroupMappingRoutes from "./modules/category-group-mapping/categoryGroupMapping.route";
 import variantRoutes from "./modules/varients_feilds/varients_routes";
 import businessRoutes from "./modules/business/business.routes";
+import multitabRoutes from "./modules/multitab/multitab.routes";
+import publicMultitabRoutes from "./modules/multitab/public.routes";
+
 
 import { authMiddleware } from "./middlewares/auth.middlewares";
 import { verifyApiKey } from "./middlewares/api_key.verfication";
@@ -43,13 +41,15 @@ const app = express();
 
 app.set("trust proxy", 1); // 👈 ADD THIS LINE
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.disable("x-powered-by");
 app.use(express.json({ limit: "10kb" }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 5000,
 });
 app.use("/api", limiter);
 
@@ -112,12 +112,10 @@ safeSync();
 // ✅ run every 5 minutes
 setInterval(safeSync, 5 * 60 * 1000);
 
-// 🔑 Apply API key globally
-// app.use("/api", verifyApiKey);
-
 app.use("/api/outsideapis", outsideapis);
+app.use("/api/public/multitab", publicMultitabRoutes);
 
-// 🔐 All protected routes
+// Protected routes below
 app.use("/api", authMiddleware);
 
 // 📦 Modules
@@ -138,9 +136,8 @@ app.use("/api/categoryGroup", categoryGroupRoutes);
 app.use("/api/categoryGroupMapping", categoryGroupMappingRoutes);
 app.use("/api/businessCategoryGroup", businessCategoryGroupRoutes);
 app.use("/api/variant", variantRoutes);
-app.use("/api/multitab", MultitabRoutes);
-app.use("/api/multitab-fields", multitabFieldsRoutes);
-app.use("/api/multitab-config", multitabconfig);
+app.use("/api/multitab", multitabRoutes);
+
 
 // Static uploads
 app.use("/uploads", express.static("uploads"));

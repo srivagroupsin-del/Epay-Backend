@@ -6,5 +6,6 @@
     "outDir": "dist",            // Build output
     "strict": true,              // Strong type safety
     "esModuleInterop": true      // Allows import express from "express"
-  }
+  },
+  "include": ["src/**/*"]
 }

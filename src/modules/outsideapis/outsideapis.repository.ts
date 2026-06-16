@@ -1,4 +1,5 @@
 import pool from "../../config/db";
+import { getProductImageUrl } from "../../utils/imageUrl";
 
 export const getProducts = async ({
   limit,
@@ -25,11 +26,11 @@ export const getProducts = async ({
         AND pan.alternative_name LIKE ?
       )
 
-      -- 🔥 DYNAMIC FIELDS (barcode, gst, etc.)
+      -- 🔥 BARCODES
       OR EXISTS (
-        SELECT 1 FROM product_dynamic_fields pdf
-        WHERE pdf.product_id = p.id
-        AND pdf.value LIKE ?
+        SELECT 1 FROM product_barcodes pb
+        WHERE pb.product_id = p.id
+        AND pb.barcode LIKE ?
       )
     )
   `;
@@ -146,12 +147,7 @@ export const getProductById = async (id: number) => {
       pc.id AS primary_category_id,
       pc.category_name AS primary_category_name,
       b.id AS brand_id,
-      b.brand_name,
-
-      pdf.field_id,
-      pdf.value,
-      f.field_name,
-      f.display_name
+      b.brand_name
 
     FROM product p
 
@@ -172,13 +168,6 @@ export const getProductById = async (id: number) => {
 
     LEFT JOIN brand b
       ON b.id = cb.brand_id
-
-    LEFT JOIN product_dynamic_fields pdf 
-    ON pdf.product_id = p.id 
-    AND pdf.category_brand_id = pcb.category_brand_id
-
-    LEFT JOIN multitab_fields f
-    ON f.id = pdf.field_id
 
     WHERE p.id = ?
       AND p.is_active = 1
@@ -227,7 +216,7 @@ export const productUrlKey = async () => {
   };
 };
 
-export const getProductsWithMappings = async (search: string = "") => {
+export const getProductsWithMappings = async (search: string = "", baseUrl: string = "") => {
   // 🔒 Safety
   search = search?.trim() || "";
 
@@ -274,10 +263,11 @@ SELECT
     
     p.id AS product_id,
     p.product_name,
-    p.description AS product_description
+    p.description AS product_description,
+    p.base_image AS base_image
 
 FROM product p
-
+ 
 LEFT JOIN product_category_brand pcb 
     ON p.id = pcb.product_id
 
@@ -371,10 +361,16 @@ ${searchQuery}
         });
       }
 
+      const baseImage = row.base_image;
+      const imageUrl = getProductImageUrl(baseImage, baseUrl);
       sec.brands.get(brandId).products.push({
         product_id: row.product_id,
         product_name: row.product_name,
         product_description: row.product_description,
+        base_image: baseImage,
+        image_id: baseImage || null,
+        image: baseImage || null,
+        image_url: imageUrl,
       });
     } else {
       // 🔸 DIRECT UNDER PRIMARY
@@ -389,10 +385,16 @@ ${searchQuery}
         });
       }
 
+      const baseImage2 = row.base_image;
+      const imageUrl2 = getProductImageUrl(baseImage2, baseUrl);
       category.brands.get(brandId).products.push({
         product_id: row.product_id,
         product_name: row.product_name,
         product_description: row.product_description,
+        base_image: baseImage2,
+        image_id: baseImage2 || null,
+        image: baseImage2 || null,
+        image_url: imageUrl2,
       });
     }
   }
@@ -416,4 +418,8 @@ ${searchQuery}
   return {
     data: finalData,
   };
+};
+
+export const updateProductMRP = async (id: number, mrp: number) => {
+  await pool.query(`UPDATE product SET mrp = ? WHERE id = ?`, [mrp, id]);
 };

@@ -1,45 +1,36 @@
 import { Router } from "express";
-import * as c from "./multitab.controller";
-import { uploadTo } from "../../config/multer";
+import * as ctrl from "./multitab.controller";
+import { uploadTo, uploadMultitabFiles } from "../../config/multer";
 
-const r = Router();
+const router = Router();
 
-/* MENU */
-r.post("/multitab-menu", c.createMenu);
-r.get("/multitab-menu/all", c.getMenus);
-r.get("/multitab-menu/:id", c.getMenuById);
-r.put("/multitab-menu/:id", c.updateMenu);
-r.delete("/multitab-menu/:id", c.deleteMenu);
+/* ================= MENUS ================= */
+router.get("/menus", ctrl.getMenus);
+router.get("/menus/:id", ctrl.getMenuById);
+router.post("/menus", ctrl.createMenu);
+router.put("/menus/:id", ctrl.updateMenu);
+router.delete("/menus/:id", ctrl.deleteMenu);
 
-/* HEADING */
-r.post(
-  "/multitab-heading",
-  uploadTo("multitab").single("image"),
-  c.createHeading,
-);
+/* ================= TABS ================= */
+router.get("/tabs", ctrl.getTabs);
+router.get("/tabs/:id", ctrl.getTabById);
+router.post("/tabs", uploadTo("multitab/tabs").single("image"), ctrl.createTab);
+router.put("/tabs/:id", uploadTo("multitab/tabs").single("image"), ctrl.updateTab);
+router.delete("/tabs/:id", ctrl.deleteTab);
 
-r.get("/multitab-heading/all", c.getAllHeadings);
-r.get("/multitab-heading/tab/:id", c.getHeadingsByTab);
-r.get("/multitab-heading/:id", c.getHeadingById);
-r.put(
-  "/multitab-heading/:id",
-  uploadTo("multitab").single("image"),
-  c.updateHeading,
-);
+/* ================= CHECKBOXES ================= */
+router.get("/checkboxes", ctrl.getCheckboxes);
+router.get("/checkboxes/:id", ctrl.getCheckboxById);
+router.post("/checkboxes", uploadMultitabFiles().array("files", 20), ctrl.createCheckbox);
+router.put("/checkboxes/:id", uploadMultitabFiles().array("files", 20), ctrl.updateCheckbox);
+router.delete("/checkboxes/:id", ctrl.deleteCheckbox);
 
-r.delete("/multitab-heading/:id", c.deleteHeading);
+/* ================= MAPPINGS ================= */
+router.get("/mappings", ctrl.getMappings);
+router.get("/mappings/tab/:tabId", ctrl.getMappingsByTabId);
+router.post("/mappings", ctrl.updateTabMappings);
 
-/* CHECKBOX */
-r.post("/multitab-checkbox", c.createCheckbox);
-r.get("/multitab-checkbox/all", c.getCheckboxes);
-r.get("/multitab-checkbox/:id", c.getCheckboxById);
-r.put("/multitab-checkbox/:id", c.updateCheckbox);
-r.delete("/multitab-checkbox/:id", c.deleteCheckbox);
+/* ================= PREVIEW ================= */
+router.get("/preview", ctrl.getPreviewData);
 
-/* MAPPING */
-r.post("/multitab-mapping", c.mapCheckbox);
-r.get("/multitab-mapping", c.getMappingByHeading);
-r.put("/multitab-mapping/:id", c.updateMapping);
-r.delete("/multitab-mapping/:id", c.deleteMapping);
-
-export default r;
+export default router;

@@ -102,3 +102,40 @@ export const upload = multer({
     cb(null, true);
   },
 });
+
+export const uploadMultitabFiles = () => {
+  const uploadPath = path.join(uploadBase, "multitab");
+  if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+  }
+
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    },
+  });
+
+  const uploadInstance = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  });
+
+  return {
+    array: (fieldName: string, maxCount?: number) => (req: any, res: any, next: any) => {
+      uploadInstance.array(fieldName, maxCount)(req, res, (err: any) => {
+        if (err) return next(err);
+        if (req.files && Array.isArray(req.files)) {
+          req.files.forEach((file: any) => {
+            file.filename = `multitab/${file.filename}`;
+          });
+        }
+        next();
+      });
+    },
+  };
+};
+

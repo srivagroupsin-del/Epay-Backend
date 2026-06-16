@@ -2,11 +2,14 @@ import { Request, Response } from "express";
 import * as service from "./sub_sector.service";
 import fs from "fs";
 import { AuthRequest } from "../../middlewares/auth.middlewares";
+import { getBaseUrl, mapEntityImageFields } from "../../utils/imageUrl";
 
 /* GET ALL */
-export const getSubSectors = async (_: Request, res: Response) => {
+export const getSubSectors = async (req: Request, res: Response) => {
   const data = await service.fetchSubSectors();
-  res.json({ success: true, data });
+  const baseUrl = getBaseUrl(req);
+  const mappedData = (data as any[]).map(item => mapEntityImageFields(item, baseUrl));
+  res.json({ success: true, data: mappedData });
 };
 
 /* CREATE */

@@ -2,17 +2,22 @@ import { Request, Response } from "express";
 import * as service from "./brand.service";
 import fs from "fs";
 import { AuthRequest } from "../../middlewares/auth.middlewares";
+import { getBaseUrl, mapEntityImageFields } from "../../utils/imageUrl";
 
 /* GET */
-export const getBrands = async (_: AuthRequest, res: Response) => {
+export const getBrands = async (req: AuthRequest, res: Response) => {
   const data = await service.fetchBrands();
-  res.json({ success: true, data });
+  const baseUrl = getBaseUrl(req);
+  const mappedData = (data as any[]).map(item => mapEntityImageFields(item, baseUrl));
+  res.json({ success: true, data: mappedData });
 };
 
 export const getBrandById = async (req: Request, res: Response) => {
   try {
     const data = await service.fetchBrandById(Number(req.params.id));
-    res.json({ success: true, data });
+    const baseUrl = getBaseUrl(req);
+    const mappedData = mapEntityImageFields(data, baseUrl);
+    res.json({ success: true, data: mappedData });
   } catch (e: any) {
     res.status(404).json({ success: false, message: e.message });
   }

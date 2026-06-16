@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AuthRequest } from "../../middlewares/auth.middlewares";
 import * as service from "./sector_title.service";
 import fs from "fs";
+import { getBaseUrl, mapEntityImageFields } from "../../utils/imageUrl";
 
 /**
  * Create sector title
@@ -46,10 +47,12 @@ export const createSectorTitle = async (req: AuthRequest, res: Response) => {
  */
 export const getSectorTitles = async (req: Request, res: Response) => {
   const data = await service.fetchSectorTitles();
+  const baseUrl = getBaseUrl(req);
+  const mappedData = (data as any[]).map(item => mapEntityImageFields(item, baseUrl));
 
   res.json({
     success: true,
-    data,
+    data: mappedData,
   });
 };
 
@@ -61,10 +64,12 @@ export const getSectorTitleById = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
 
     const data = await service.fetchSectorTitleById(id);
+    const baseUrl = getBaseUrl(req);
+    const mappedData = mapEntityImageFields(data, baseUrl);
 
     res.json({
       success: true,
-      data,
+      data: mappedData,
     });
   } catch (err: any) {
     res.status(404).json({

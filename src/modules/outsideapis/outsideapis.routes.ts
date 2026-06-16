@@ -10,4 +10,6 @@ router.get("/products/:id", ctrl.getProductById);
 // 🔑 Get Product Keys
 router.get("/product/keys", ctrl.getProductKeys);
 
+router.put("/products/:id/mrp", ctrl.updateMRP);
+
 export default router;

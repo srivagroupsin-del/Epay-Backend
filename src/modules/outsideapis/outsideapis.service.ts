@@ -11,7 +11,7 @@ export const fetchProductById = async (id: number) => {
     throw new Error("Product not found");
   }
 
-  const dynamicMap = new Map<string, any>(); // ✅ FIXED
+
 
   const first = rows[0];
 
@@ -56,25 +56,12 @@ export const fetchProductById = async (id: number) => {
       });
     }
 
-    // 🔥 FIXED DYNAMIC FIELD LOGIC
-    if (row.field_id) {
-      const key = `${row.mapping_id}_${row.field_id}`;
 
-      if (!dynamicMap.has(key)) {
-        dynamicMap.set(key, {
-          mapping_id: row.mapping_id,
-          field_id: row.field_id,
-          field_name: row.field_name,
-          display_name: row.display_name,
-          value: row.value,
-        });
-      }
-    }
   }
 
   product.alternative_names = Array.from(altSet);
 
-  (product as any).dynamic_fields = Array.from(dynamicMap.values());
+
 
   return product;
 };
@@ -83,6 +70,11 @@ export const fetchProductKeys = async () => {
   return repo.productUrlKey();
 };
 
-export const fetchProductMappings = async (search: string = "") => {
-  return repo.getProductsWithMappings(search);
+export const fetchProductMappings = async (search: string = "", baseUrl: string = "") => {
+  return repo.getProductsWithMappings(search, baseUrl);
+};
+
+export const updateMRP = async (id: number, mrp: number) => {
+  await repo.updateProductMRP(id, mrp);
+  return { message: "MRP updated successfully" };
 };

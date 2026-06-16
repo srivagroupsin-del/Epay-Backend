@@ -24,8 +24,6 @@ export const fetchProductById = async (id: number) => {
     throw new Error("Product not found");
   }
 
-  const dynamicMap = new Map<string, any>(); // ✅ FIXED
-
   const first = rows[0];
 
   const product = {
@@ -42,6 +40,9 @@ export const fetchProductById = async (id: number) => {
     status: first.status,
     alternative_names: [] as string[],
     mappings: [] as any[],
+    brands: "" as string,
+    categories: "" as string,
+    barcodes: [] as any[]
   };
 
   const altSet = new Set<string>();
@@ -68,26 +69,29 @@ export const fetchProductById = async (id: number) => {
         brand_name: row.brand_name,
       });
     }
-
-    // 🔥 FIXED DYNAMIC FIELD LOGIC
-    if (row.field_id) {
-      const key = `${row.mapping_id}_${row.field_id}`;
-
-      if (!dynamicMap.has(key)) {
-        dynamicMap.set(key, {
-          mapping_id: row.mapping_id,
-          field_id: row.field_id,
-          field_name: row.field_name,
-          display_name: row.display_name,
-          value: row.value,
-        });
-      }
-    }
   }
 
   product.alternative_names = Array.from(altSet);
 
-  (product as any).dynamic_fields = Array.from(dynamicMap.values());
+  const brandNames = Array.from(new Set(product.mappings.map((m: any) => m.brand_name).filter(Boolean)));
+  product.brands = brandNames.join(', ');
+
+  const categoryNames = Array.from(new Set(product.mappings.map((m: any) => m.category_name).filter(Boolean)));
+  product.categories = categoryNames.join(', ');
+
+  // Fetch barcodes
+  const [barcodeRows]: any = await pool.query(
+    `SELECT pb.category_id, c.category_name, pb.barcode 
+     FROM product_barcodes pb
+     LEFT JOIN category c ON c.id = pb.category_id
+     WHERE pb.product_id = ?`,
+    [id]
+  );
+  product.barcodes = barcodeRows.map((row: any) => ({
+    category_id: row.category_id,
+    category_name: row.category_name,
+    barcode: row.barcode
+  }));
 
   return product;
 };
@@ -102,9 +106,9 @@ export const createProduct = async (data: any, userId: number) => {
     throw new Error("Mappings must be a non-empty array");
   }
 
-  const resolvedMappingIds = await resolveMappings(data.mappings);
+  const resolved = await resolveMappings(data.mappings);
 
-  data.mappings = resolvedMappingIds;
+  data.mappings = resolved.resolvedIds;
 
   const id = await repo.createProduct(data);
 
@@ -133,15 +137,15 @@ export const updateProduct = async (id: number, data: any, userId: number) => {
     await repo.updateProductAlternativeNames(id, data.alternative_names);
   }
 
-  // 3️⃣ update mappings
-  if (Array.isArray(data.mappings) && data.mappings.length > 0) {
-    const resolvedMappingIds = await resolveMappings(data.mappings);
-    await repo.updateProductMappings(id, resolvedMappingIds);
+  // 🔥 update barcodes
+  if (Array.isArray(data.barcodes)) {
+    await repo.updateProductBarcodes(id, data.barcodes);
   }
 
-  // 🔥 ADD THIS
-  if (Array.isArray(data.dynamic_fields)) {
-    await repo.updateProductDynamicFields(id, data.dynamic_fields);
+  // 3️⃣ update mappings
+  if (Array.isArray(data.mappings) && data.mappings.length > 0) {
+    const resolved = await resolveMappings(data.mappings);
+    await repo.updateProductMappings(id, resolved.resolvedIds);
   }
 
   await logAudit({
@@ -166,16 +170,16 @@ export const updateProductMappings = async (
     throw new Error("Mappings must be a non-empty array");
   }
 
-  const resolvedMappingIds = await resolveMappings(mappings);
+  const resolved = await resolveMappings(mappings);
 
-  await repo.updateProductMappings(productId, resolvedMappingIds);
+  await repo.updateProductMappings(productId, resolved.resolvedIds);
 
   await logAudit({
     user_id: userId,
     module: "product",
     record_id: productId,
     action: "update",
-    new_data: { mappings: resolvedMappingIds },
+    new_data: { mappings: resolved.resolvedIds },
   });
 
   return { message: "Product mappings updated successfully" };
@@ -264,6 +268,7 @@ export const bulkUpdateMappings = async (
 ========================================= */
 const resolveMappings = async (mappings: any[]) => {
   const resolved: number[] = [];
+  const categoryMap = new Map<number, number>();
 
   for (const m of mappings) {
     const primaryId = Number(m.primary_id);
@@ -312,10 +317,20 @@ const resolveMappings = async (mappings: any[]) => {
       );
     }
 
-    resolved.push(rows[0].id);
+    const mappingId = rows[0].id;
+    resolved.push(mappingId);
+
+    // 🔥 Store mapping for dynamic fields
+    categoryMap.set(primaryId, mappingId);
+    if (secondaryId > 0) {
+      categoryMap.set(secondaryId, mappingId);
+    }
   }
 
-  return [...new Set(resolved)];
+  return {
+    resolvedIds: [...new Set(resolved)],
+    categoryMap,
+  };
 };
 
 export const fetchProductMappings = async () => {
@@ -370,6 +385,7 @@ export const updateFullProduct = async (
   product: any,
   mappings: number[],
   alternative_names: string[],
+  barcodes: any[],
   userId: number,
 ) => {
   const conn = await pool.getConnection();
@@ -379,11 +395,6 @@ export const updateFullProduct = async (
 
     // 1️⃣ product
     await repo.updateProductTx(product.id, product);
-
-    // 🔥 ADD THIS BEFORE commit
-    if (product.dynamic_fields) {
-      await repo.updateProductDynamicFields(product.id, product.dynamic_fields);
-    }
 
     // 2️⃣ alternative names
     await conn.query(
@@ -401,6 +412,22 @@ export const updateFullProduct = async (
       );
     }
 
+    // 🔥 BARCODES
+    await conn.query(
+      `DELETE FROM product_barcodes WHERE product_id = ?`,
+      [product.id],
+    );
+
+    if (barcodes?.length) {
+      const values = barcodes.map((b: any) => [product.id, b.category_id, b.barcode]);
+
+      await conn.query(
+        `INSERT INTO product_barcodes (product_id, category_id, barcode)
+         VALUES ?`,
+        [values],
+      );
+    }
+
     // 3️⃣ mappings
     const uniqueMappings = [...new Set(mappings)];
     await repo.updateProductMappingsTx(product.id, uniqueMappings);
@@ -412,7 +439,7 @@ export const updateFullProduct = async (
       module: "product",
       record_id: product.id,
       action: "update",
-      new_data: { product, mappings, alternative_names },
+      new_data: { product, mappings, alternative_names, barcodes },
     });
 
     return { message: "Product updated successfully" };
@@ -496,3 +523,171 @@ export const removeProductTax = async (id: number, userId: number) => {
     message: "Product tax deleted successfully",
   };
 };
+
+/* =========================================
+   FETCH PRODUCT STRUCTURE
+========================================= */
+export const fetchProductStructure = async () => {
+  const columns = await repo.getProductStructure();
+
+  const enrichedFields = columns.map((col: any) => {
+    let type = "string";
+    const lowerType = col.Type.toLowerCase();
+
+    if (
+      lowerType.includes("int") ||
+      lowerType.includes("decimal") ||
+      lowerType.includes("double") ||
+      lowerType.includes("float")
+    ) {
+      type = "number";
+    } else if (
+      lowerType.includes("date") ||
+      lowerType.includes("time") ||
+      lowerType.includes("timestamp")
+    ) {
+      type = "date";
+    } else if (
+      lowerType.includes("tinyint(1)") ||
+      lowerType.includes("boolean") ||
+      lowerType.includes("bit")
+    ) {
+      type = "boolean";
+    }
+
+    const label = col.Field
+      .split("_")
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+
+    return {
+      field: col.Field,
+      type: type,
+      dbType: col.Type,
+      isNullable: col.Null === "YES",
+      isPrimaryKey: col.Key === "PRI",
+      defaultValue: col.Default,
+      extra: col.Extra,
+      label: label,
+    };
+  });
+
+  const relationalFields = [
+    {
+      field: "alternative_names",
+      type: "array",
+      dbType: "varchar(255)[] (via product_alternative_names)",
+      isNullable: true,
+      isPrimaryKey: false,
+      defaultValue: null,
+      extra: "Relational - list of alternative names for search",
+      label: "Alternative Names",
+    },
+    {
+      field: "barcodes",
+      type: "array",
+      dbType: "relation[] (via product_barcodes)",
+      isNullable: true,
+      isPrimaryKey: false,
+      defaultValue: null,
+      extra: "Relational - barcodes per category",
+      label: "Barcodes",
+    },
+    {
+      field: "mappings",
+      type: "array",
+      dbType: "relation[] (via product_category_brand)",
+      isNullable: false,
+      isPrimaryKey: false,
+      defaultValue: null,
+      extra: "Relational - brand & category mapping combinations",
+      label: "Category-Brand Mappings",
+    },
+  ];
+
+  return {
+    tableName: "product",
+    fields: [...enrichedFields, ...relationalFields],
+  };
+};
+
+
+
+export const fetchProductByBarcode = async (barcode: string) => {
+  const [rows]: any = await pool.query(
+    "SELECT product_id FROM product_barcodes WHERE barcode = ? AND is_active = 1",
+    [barcode]
+  );
+  if (!rows || rows.length === 0) {
+    const [modelRows]: any = await pool.query(
+      "SELECT id FROM product WHERE model = ? AND is_active = 1",
+      [barcode]
+    );
+    if (!modelRows || modelRows.length === 0) {
+      throw new Error("Product not found for the given barcode");
+    }
+    return fetchProductById(modelRows[0].id);
+  }
+  return fetchProductById(rows[0].product_id);
+};
+
+export const generateProductBarcode = async (productId: number, categoryId: number | undefined, userId: number) => {
+  let targetCategoryId = categoryId;
+  
+  if (!targetCategoryId) {
+    const [mappings]: any = await pool.query(
+      `SELECT cb.category_id 
+       FROM product_category_brand pcb
+       JOIN category_brand_mapping cb ON cb.id = pcb.category_brand_id
+       WHERE pcb.product_id = ? AND pcb.is_active = 1 AND cb.is_active = 1
+       LIMIT 1`,
+      [productId]
+    );
+    if (!mappings || !mappings.length) {
+      throw new Error("Product must be mapped to a category before generating a barcode.");
+    }
+    targetCategoryId = mappings[0].category_id;
+  }
+
+  let barcode = "";
+  let isUnique = false;
+  let attempts = 0;
+  
+  while (!isUnique && attempts < 10) {
+    attempts++;
+    barcode = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    
+    const [rows]: any = await pool.query(
+      "SELECT 1 FROM product_barcodes WHERE barcode = ? AND is_active = 1 LIMIT 1",
+      [barcode]
+    );
+    if (rows.length === 0) {
+      isUnique = true;
+    }
+  }
+
+  if (!isUnique) {
+    throw new Error("Failed to generate a unique barcode. Please try again.");
+  }
+
+  await pool.query(
+    `INSERT INTO product_barcodes (product_id, category_id, barcode)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE barcode = VALUES(barcode)`,
+    [productId, targetCategoryId, barcode]
+  );
+
+  await logAudit({
+    user_id: userId,
+    module: "product_barcodes",
+    record_id: productId,
+    action: "create",
+    new_data: { product_id: productId, category_id: targetCategoryId, barcode },
+  });
+
+  return {
+    category_id: targetCategoryId,
+    barcode,
+  };
+};
+

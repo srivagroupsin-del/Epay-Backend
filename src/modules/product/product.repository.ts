@@ -54,20 +54,20 @@ export const createProduct = async (data: any) => {
       [values],
     );
 
-    /* 🔥 SAVE DYNAMIC FIELDS */
-    if (Array.isArray(data.dynamic_fields) && data.dynamic_fields.length) {
-      const dynamicValues = data.dynamic_fields.map((f: any) => [
+
+
+    /* 🔥 SAVE BARCODES */
+    if (Array.isArray(data.barcodes) && data.barcodes.length) {
+      const barcodeValues = data.barcodes.map((b: any) => [
         productId,
-        f.mapping_id, // 🔥 ADD THIS
-        f.field_id,
-        f.value,
+        b.category_id,
+        b.barcode,
       ]);
 
       await conn.query(
-        `INSERT INTO product_dynamic_fields 
-         (product_id, category_brand_id, field_id, value)
+        `INSERT INTO product_barcodes (product_id, category_id, barcode)
          VALUES ?`,
-        [dynamicValues],
+        [barcodeValues],
       );
     }
 
@@ -90,6 +90,8 @@ export const getProducts = async ({
   search,
   brand,
   category,
+  primary_category,
+  secondary_category,
   status,
 }: any) => {
   let where = `WHERE p.is_active = 1`;
@@ -109,11 +111,11 @@ export const getProducts = async ({
         AND pan.alternative_name LIKE ?
       )
 
-      -- 🔥 DYNAMIC FIELDS (barcode, gst, etc.)
+      -- 🔥 BARCODES
       OR EXISTS (
-        SELECT 1 FROM product_dynamic_fields pdf
-        WHERE pdf.product_id = p.id
-        AND pdf.value LIKE ?
+        SELECT 1 FROM product_barcodes pb
+        WHERE pb.product_id = p.id
+        AND pb.barcode LIKE ?
       )
     )
   `;
@@ -133,6 +135,18 @@ export const getProducts = async ({
     values.push(category);
   }
 
+  // 📦 PRIMARY CATEGORY FILTER
+  if (primary_category) {
+    where += ` AND COALESCE(pc.category_name, c.category_name) = ?`;
+    values.push(primary_category);
+  }
+
+  // 📦 SECONDARY CATEGORY FILTER
+  if (secondary_category) {
+    where += ` AND c.category_name = ? AND pc.id IS NOT NULL`;
+    values.push(secondary_category);
+  }
+
   // ⚡ STATUS FILTER
   if (status) {
     where += ` AND p.status = ?`;
@@ -150,7 +164,9 @@ export const getProducts = async ({
       p.status,
 
       GROUP_CONCAT(DISTINCT b.brand_name) AS brands,
-      GROUP_CONCAT(DISTINCT c.category_name) AS categories
+      GROUP_CONCAT(DISTINCT c.category_name) AS categories,
+      GROUP_CONCAT(DISTINCT COALESCE(pc.category_name, c.category_name)) AS primary_category,
+      GROUP_CONCAT(DISTINCT CASE WHEN pc.id IS NOT NULL THEN c.category_name ELSE NULL END) AS secondary_category
 
     FROM product p
 
@@ -165,6 +181,9 @@ export const getProducts = async ({
 
     LEFT JOIN category c 
       ON c.id = cb.category_id
+
+    LEFT JOIN category pc
+      ON pc.id = c.parent_category_id
 
     ${where}
 
@@ -191,6 +210,8 @@ export const getProducts = async ({
       ON b.id = cb.brand_id
     LEFT JOIN category c 
       ON c.id = cb.category_id
+    LEFT JOIN category pc
+      ON pc.id = c.parent_category_id
     ${where}
   `;
 
@@ -230,12 +251,7 @@ export const getProductById = async (id: number) => {
       pc.id AS primary_category_id,
       pc.category_name AS primary_category_name,
       b.id AS brand_id,
-      b.brand_name,
-
-      pdf.field_id,
-      pdf.value,
-      f.field_name,
-      f.display_name
+      b.brand_name
 
     FROM product p
 
@@ -256,13 +272,6 @@ export const getProductById = async (id: number) => {
 
     LEFT JOIN brand b
       ON b.id = cb.brand_id
-
-    LEFT JOIN product_dynamic_fields pdf 
-    ON pdf.product_id = p.id 
-    AND pdf.category_brand_id = pcb.category_brand_id
-
-    LEFT JOIN multitab_fields f
-    ON f.id = pdf.field_id
 
     WHERE p.id = ?
       AND p.is_active = 1
@@ -301,6 +310,7 @@ SELECT
     -- Product
     p.id AS product_id,
     p.product_name,
+    p.base_image,
     
     -- Mapping IDs (for debugging/internal use)
     pcb.id AS product_mapping_id,
@@ -403,6 +413,39 @@ export const updateProductAlternativeNames = async (
   }
 };
 
+export const updateProductBarcodes = async (
+  productId: number,
+  barcodes: { category_id: number; barcode: string }[],
+) => {
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    await conn.query(
+      `DELETE FROM product_barcodes WHERE product_id = ?`,
+      [productId],
+    );
+
+    if (barcodes.length) {
+      const values = barcodes.map((b) => [productId, b.category_id, b.barcode]);
+
+      await conn.query(
+        `INSERT INTO product_barcodes (product_id, category_id, barcode)
+         VALUES ?`,
+        [values],
+      );
+    }
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
 /* ===============================
    UPDATE PRODUCT MAPPINGS
 ================================ */
@@ -447,44 +490,7 @@ export const updateProductMappings = async (
   }
 };
 
-export const updateProductDynamicFields = async (
-  productId: number,
-  fields: any[],
-) => {
-  const conn = await pool.getConnection();
 
-  try {
-    await conn.beginTransaction();
-
-    await conn.query(
-      `DELETE FROM product_dynamic_fields WHERE product_id = ?`,
-      [productId],
-    );
-
-    if (fields.length) {
-      const values = fields.map((f) => [
-        productId,
-        f.mapping_id, // 🔥 REQUIRED
-        f.field_id,
-        f.value,
-      ]);
-
-      await conn.query(
-        `INSERT INTO product_dynamic_fields 
-        (product_id, category_brand_id, field_id, value)
-        VALUES ?`,
-        [values],
-      );
-    }
-
-    await conn.commit();
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
-};
 
 export const deleteProduct = async (id: number) => {
   await pool.query(`UPDATE product SET is_active = 0 WHERE id = ?`, [id]);
@@ -645,3 +651,11 @@ export const deleteProductTax = async (id: number) => {
     [id],
   );
 };
+
+/* ================= PRODUCT STRUCTURE ================= */
+
+export const getProductStructure = async () => {
+  const [rows]: any = await pool.query("SHOW COLUMNS FROM product");
+  return rows;
+};
+
