@@ -1,12 +1,10 @@
 export interface CreateMultitabMenuDTO {
-  menu_title_id: number;
   menu_name: string;
   description?: string;
   status: "active" | "inactive";
 }
 
 export interface UpdateMultitabMenuDTO {
-  menu_title_id?: number;
   menu_name?: string;
   description?: string;
   status?: "active" | "inactive";

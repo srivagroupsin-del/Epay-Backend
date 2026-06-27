@@ -259,3 +259,19 @@ export const updateTabMappings = async (tabId: number, checkboxIds: number[], us
 
   return { message: "Mappings updated successfully" };
 };
+
+export const getMenuAssociations = async (menuTitle: string, associatedId: number, parentAssociatedId: number | null) => {
+  return repo.getMenuAssociations(menuTitle, associatedId, parentAssociatedId);
+};
+
+export const saveMenuAssociations = async (menuTitle: string, associatedId: number, parentAssociatedId: number | null, menuIds: number[], userId: number) => {
+  await repo.saveMenuAssociations(menuTitle, associatedId, parentAssociatedId, menuIds);
+  await logAudit({
+    user_id: userId,
+    module: "multitab_menu_associations",
+    record_id: associatedId,
+    action: "update",
+    new_data: { menuTitle, associatedId, parentAssociatedId, menuIds },
+  });
+  return { message: "Menu associations saved successfully" };
+};

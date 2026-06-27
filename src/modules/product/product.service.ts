@@ -10,8 +10,20 @@ import { ensureUniqueActive } from "../../utils/uniqueCheck";
 /* =========================================
    FETCH ALL PRODUCTS
 ========================================= */
+const parseIds = (val: string | null): number[] =>
+  val ? val.split(",").map(Number) : [];
+
 export const fetchProducts = async (params: any) => {
-  return repo.getProducts(params);
+  const result = await repo.getProducts(params);
+
+  const data = (result.data as any[]).map((row) => ({
+    ...row,
+    brand_ids: parseIds(row.brand_ids),
+    primary_category_ids: parseIds(row.primary_category_ids),
+    secondary_category_ids: parseIds(row.secondary_category_ids),
+  }));
+
+  return { ...result, data };
 };
 
 /* =========================================

@@ -163,9 +163,13 @@ export const getProducts = async ({
       p.base_image,
       p.status,
 
+      GROUP_CONCAT(DISTINCT b.id) AS brand_ids,
       GROUP_CONCAT(DISTINCT b.brand_name) AS brands,
-      GROUP_CONCAT(DISTINCT c.category_name) AS categories,
+
+      GROUP_CONCAT(DISTINCT COALESCE(pc.id, c.id)) AS primary_category_ids,
       GROUP_CONCAT(DISTINCT COALESCE(pc.category_name, c.category_name)) AS primary_category,
+
+      GROUP_CONCAT(DISTINCT CASE WHEN pc.id IS NOT NULL THEN c.id ELSE NULL END) AS secondary_category_ids,
       GROUP_CONCAT(DISTINCT CASE WHEN pc.id IS NOT NULL THEN c.category_name ELSE NULL END) AS secondary_category
 
     FROM product p

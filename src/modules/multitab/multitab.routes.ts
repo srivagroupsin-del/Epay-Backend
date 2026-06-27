@@ -33,4 +33,8 @@ router.post("/mappings", ctrl.updateTabMappings);
 /* ================= PREVIEW ================= */
 router.get("/preview", ctrl.getPreviewData);
 
+/* ================= ASSOCIATIONS ================= */
+router.get("/associations", ctrl.getMenuAssociations);
+router.post("/associations", ctrl.saveMenuAssociations);
+
 export default router;

@@ -12,10 +12,8 @@ import {
 /* ================= MENUS ================= */
 export const getMenus = async () => {
   const [rows] = await pool.query(`
-    SELECT m.id, m.menu_title_id, m.menu_name, m.description, m.status, m.is_active,
-           mt.menu_title AS menu_title_name
+    SELECT m.id, m.menu_name, m.description, m.status, m.is_active
     FROM multitab_menus m
-    LEFT JOIN menu_title mt ON m.menu_title_id = mt.id
     WHERE m.is_active = 1
     ORDER BY m.menu_name ASC
   `);
@@ -32,9 +30,13 @@ export const getMenuById = async (id: number) => {
 
 export const createMenu = async (data: CreateMultitabMenuDTO) => {
   const [result]: any = await pool.query(
-    `INSERT INTO multitab_menus (menu_title_id, menu_name, description, status)
-     VALUES (?, ?, ?, ?)`,
-    [data.menu_title_id, data.menu_name, data.description || null, data.status]
+    `INSERT INTO multitab_menus (menu_name, description, status)
+     VALUES (?, ?, ?)`,
+    [
+      data.menu_name,
+      data.description || null,
+      data.status,
+    ]
   );
   return result.insertId;
 };
@@ -43,10 +45,6 @@ export const updateMenu = async (id: number, data: UpdateMultitabMenuDTO) => {
   const fields: string[] = [];
   const values: any[] = [];
 
-  if (data.menu_title_id !== undefined) {
-    fields.push("menu_title_id = ?");
-    values.push(data.menu_title_id);
-  }
   if (data.menu_name !== undefined) {
     fields.push("menu_name = ?");
     values.push(data.menu_name);
@@ -289,5 +287,50 @@ export const removeMappingsForTabExcept = async (tabId: number, checkboxIds: num
       `UPDATE multitab_mappings SET is_active = 0 WHERE tab_id = ? AND checkbox_id NOT IN (?)`,
       [tabId, checkboxIds]
     );
+  }
+};
+
+export const getMenuAssociations = async (menuTitle: string, associatedId: number, parentAssociatedId: number | null) => {
+  const query = `
+    SELECT menu_id FROM multitab_menu_associations 
+    WHERE menu_title = ? 
+      AND associated_id = ? 
+      AND (parent_associated_id = ? OR (? IS NULL AND parent_associated_id IS NULL))
+      AND is_active = 1
+  `;
+  const [rows] = await pool.query(query, [menuTitle, associatedId, parentAssociatedId, parentAssociatedId]);
+  return (rows as any[]).map(row => row.menu_id);
+};
+
+export const saveMenuAssociations = async (menuTitle: string, associatedId: number, parentAssociatedId: number | null, menuIds: number[]) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. Soft delete existing associations for this context
+    await connection.query(
+      `UPDATE multitab_menu_associations 
+       SET is_active = 0 
+       WHERE menu_title = ? 
+         AND associated_id = ? 
+         AND (parent_associated_id = ? OR (? IS NULL AND parent_associated_id IS NULL))`,
+      [menuTitle, associatedId, parentAssociatedId, parentAssociatedId]
+    );
+
+    // 2. Insert new associations
+    for (const menuId of menuIds) {
+      await connection.query(
+        `INSERT INTO multitab_menu_associations (menu_id, menu_title, associated_id, parent_associated_id, status, is_active)
+         VALUES (?, ?, ?, ?, 'active', 1)`,
+        [menuId, menuTitle, associatedId, parentAssociatedId]
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
 };

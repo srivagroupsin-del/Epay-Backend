@@ -380,3 +380,36 @@ export const getPublicPreviewByTitle = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: e.message });
   }
 };
+
+export const getMenuAssociations = async (req: AuthRequest, res: Response) => {
+  try {
+    const menuTitle = String(req.query.menuTitle || "");
+    const associatedId = Number(req.query.associatedId || 0);
+    const parentAssociatedId = req.query.parentAssociatedId ? Number(req.query.parentAssociatedId) : null;
+
+    if (!menuTitle || !associatedId) {
+      return res.status(400).json({ success: false, message: "menuTitle and associatedId are required query parameters" });
+    }
+
+    const data = await service.getMenuAssociations(menuTitle, associatedId, parentAssociatedId);
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+export const saveMenuAssociations = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = Number(req.user?.id || 1);
+    const { menuTitle, associatedId, parentAssociatedId, menuIds } = req.body;
+
+    if (!menuTitle || !associatedId || !Array.isArray(menuIds)) {
+      return res.status(400).json({ success: false, message: "menuTitle, associatedId and menuIds (array) are required" });
+    }
+
+    const result = await service.saveMenuAssociations(menuTitle, associatedId, parentAssociatedId || null, menuIds, userId);
+    res.json({ success: true, ...result });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
