@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import axios from "axios";
 import jwt from "jsonwebtoken";
 import * as authRepo from "./auth.repository";
@@ -5,8 +6,39 @@ import { getAuthHeaders } from "../../utils/getAuthHeaders";
 
 export const login = async (email: string, password: string) => {
   try {
+    // 1. Try local database authentication first
+    const user = await authRepo.findUserByEmail(email);
+
+    if (user && user.password && user.password !== "external_auth") {
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (isMatch) {
+        console.log("Local Login success for:", user.email);
+
+        // Generate local token
+        const token = jwt.sign(
+          {
+            id: user.id,
+            email: user.email,
+            user_id: user.user_id,
+          },
+          process.env.JWT_SECRET as string,
+          { expiresIn: "1d" },
+        );
+
+        return {
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            user_id: user.user_id,
+          },
+        };
+      }
+    }
+
+    // 2. Fallback to Central API auth
     const headers = await getAuthHeaders();
-    // 🔹 Call central API
     const response = await axios.post(
       "https://user.jobes24x7.com/api/login/authenticate",
       { email, password },
@@ -28,7 +60,7 @@ export const login = async (email: string, password: string) => {
       throw new Error("Invalid user data from central API");
     }
 
-    console.log("Login success for:", userData.email);
+    console.log("Central Login success for:", userData.email);
 
     const centralToken = apiData.token;
     const expiryISO = apiData.expires_at;
@@ -39,10 +71,9 @@ export const login = async (email: string, password: string) => {
       .slice(0, 19)
       .replace("T", " ");
 
-    // 🔹 Find or create user
-    let user = await authRepo.findUserByEmail(userData.email);
+    let finalUser = user;
 
-    if (!user) {
+    if (!finalUser) {
       const newUserId = await authRepo.createUser({
         user_id: userData.user_main_id,
         name: userData.user_name,
@@ -50,22 +81,24 @@ export const login = async (email: string, password: string) => {
         password: "external_auth",
       });
 
-      user = {
+      finalUser = {
         id: newUserId,
         email: userData.email,
+        name: userData.user_name,
+        user_id: userData.user_main_id,
       };
     } else {
-      await authRepo.updateUserMainId(user.id, userData.user_main_id);
+      await authRepo.updateUserMainId(finalUser.id, userData.user_main_id);
     }
 
     // 🔥 ALWAYS SAVE CENTRAL TOKEN (FIXED)
-    await authRepo.updateCentralToken(user.id, centralToken, expiry);
+    await authRepo.updateCentralToken(finalUser.id, centralToken, expiry);
 
     // 🔹 Generate YOUR token
     const token = jwt.sign(
       {
-        id: user.id,
-        email: user.email,
+        id: finalUser.id,
+        email: finalUser.email,
         user_id: userData.user_main_id, // 🔥 IMPORTANT
       },
       process.env.JWT_SECRET as string,
@@ -74,7 +107,7 @@ export const login = async (email: string, password: string) => {
 
     return {
       token,
-      user,
+      user: finalUser,
     };
   } catch (err: any) {
     console.error(err.response?.data || err.message);

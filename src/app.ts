@@ -36,6 +36,7 @@ import publicMultitabRoutes from "./modules/multitab/public.routes";
 import { authMiddleware } from "./middlewares/auth.middlewares";
 import { verifyApiKey } from "./middlewares/api_key.verfication";
 import { syncFromRegistry } from "./modules/api_key/apiKey.service";
+import { globalErrorHandler } from "./middlewares/error.middleware";
 
 const app = express();
 
@@ -141,6 +142,9 @@ app.use("/api/multitab", multitabRoutes);
 
 // Static uploads
 app.use("/uploads", express.static("uploads"));
+
+// Global Error Handler
+app.use(globalErrorHandler);
 
 export default app;
 

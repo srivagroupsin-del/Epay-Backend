@@ -128,7 +128,37 @@ export const getAllCategoryBrandMappings = async () => {
       ) AS secondary_name,
 
       b.id AS brand_id,
-      COALESCE(b.brand_name, '-') AS brand_name
+      COALESCE(b.brand_name, '-') AS brand_name,
+
+      -- Sector Title
+      COALESCE(
+        CASE 
+          WHEN c.category_type = 'primary' THEN c.sector_title_id
+          ELSE p.sector_title_id
+        END,
+        0
+      ) AS sector_title_id,
+      COALESCE(st.name, '-') AS sector_title_name,
+
+      -- Sector
+      COALESCE(
+        CASE 
+          WHEN c.category_type = 'primary' THEN c.sector_id
+          ELSE p.sector_id
+        END,
+        0
+      ) AS sector_id,
+      COALESCE(s.sector_name, '-') AS sector_name,
+
+      -- Sub Sector
+      COALESCE(
+        CASE 
+          WHEN c.category_type = 'primary' THEN c.sub_sector_id
+          ELSE p.sub_sector_id
+        END,
+        0
+      ) AS sub_sector_id,
+      COALESCE(ss.sub_sector_name, '-') AS sub_sector_name
 
     FROM category_brand_mapping cbm
 
@@ -144,6 +174,18 @@ export const getAllCategoryBrandMappings = async () => {
       ON p.id = c.parent_category_id
      AND p.is_active = 1
 
+    LEFT JOIN sector_title st
+      ON st.id = (CASE WHEN c.category_type = 'primary' THEN c.sector_title_id ELSE p.sector_title_id END)
+     AND st.is_active = 1
+
+    LEFT JOIN sector s
+      ON s.id = (CASE WHEN c.category_type = 'primary' THEN c.sector_id ELSE p.sector_id END)
+     AND s.is_active = 1
+
+    LEFT JOIN sub_sector ss
+      ON ss.id = (CASE WHEN c.category_type = 'primary' THEN c.sub_sector_id ELSE p.sub_sector_id END)
+     AND ss.is_active = 1
+
     WHERE cbm.is_active = 1;
   `);
 
@@ -154,6 +196,12 @@ export const getAllCategoryBrandMappings = async () => {
       tree[r.primary_id] = {
         primary_id: r.primary_id,
         primary_name: r.primary_name,
+        sector_title_id: r.sector_title_id,
+        sector_title_name: r.sector_title_name,
+        sector_id: r.sector_id,
+        sector_name: r.sector_name,
+        sub_sector_id: r.sub_sector_id,
+        sub_sector_name: r.sub_sector_name,
         brands: [],          // 👈 primary-level brands
         secondaries: {}
       };

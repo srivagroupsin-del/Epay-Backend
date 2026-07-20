@@ -7,9 +7,8 @@ export const getAuthHeaders = async () => {
   return {
     "Content-Type": "application/json",
     Accept: "application/json",
-
-    "x-api-key": data.access_token, // ✅ epay_recharge token
-    "x-service-name": "epay_recharge", // ✅ caller
+    "x-api-key": data.access_token,
+    "x-service-name": "epay_recharge",
     "x-platform": "WEB",
   };
 };
